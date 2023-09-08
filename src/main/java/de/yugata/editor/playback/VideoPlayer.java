@@ -1,7 +1,6 @@
 package de.yugata.editor.playback;
 
 import org.bytedeco.javacv.CanvasFrame;
-
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
@@ -15,13 +14,14 @@ public class VideoPlayer extends CanvasFrame {
 
     private final VideoThread videoThread;
 
-    private final List<Double> timeStamps = new ArrayList<>();
+    protected final List<Double> timeStamps = new ArrayList<>();
     private final Consumer<List<Double>> onEditingDone;
 
     public VideoPlayer(final String videoInput, Consumer<List<Double>> onEditingDone) {
         super("Easy Editor");
         this.videoThread = new VideoThread(videoInput, this);
         this.onEditingDone = onEditingDone;
+
 
         this.addWindowListener(new WindowAdapter() {
             @Override
@@ -88,7 +88,7 @@ public class VideoPlayer extends CanvasFrame {
 
                     }
                 }
-            } catch (java.lang.Exception e) {
+            } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
         }).start();
