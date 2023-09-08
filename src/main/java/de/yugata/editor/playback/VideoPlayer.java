@@ -7,7 +7,6 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 
 import static java.awt.event.KeyEvent.*;
@@ -78,6 +77,13 @@ public class VideoPlayer extends CanvasFrame {
                             timeStamps.add(videoThread.getCurrentTimeStamp());
                             getGraphics().drawString("" + timeStamps.size(), 10, 10);
                             System.out.println("Added new timestamp " + timeStamps.size());
+                            break;
+
+                        case VK_V:
+                            if (timeStamps.size() - 1 >= 0) {
+                                timeStamps.remove(timeStamps.size() - 1);
+                                System.out.println("Removed last timestamp " + timeStamps.size());
+                            }
                             break;
 
                     }
