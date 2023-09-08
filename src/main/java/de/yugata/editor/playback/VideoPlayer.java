@@ -1,6 +1,7 @@
 package de.yugata.editor.playback;
 
 import org.bytedeco.javacv.CanvasFrame;
+
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
@@ -14,18 +15,22 @@ public class VideoPlayer extends CanvasFrame {
 
     private final VideoThread videoThread;
 
-    protected final List<Double> timeStamps = new ArrayList<>();
+    private final List<Double> timeStamps = new ArrayList<>();
+    protected int requiredSegments;
+
     private final Consumer<List<Double>> onEditingDone;
 
-    public VideoPlayer(final String videoInput, Consumer<List<Double>> onEditingDone) {
+
+    public VideoPlayer(final String videoInput, final int requiredSegments, Consumer<List<Double>> onEditingDone) {
         super("Easy Editor");
         this.videoThread = new VideoThread(videoInput, this);
         this.onEditingDone = onEditingDone;
-
+        this.requiredSegments = requiredSegments;
 
         this.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
+                videoThread.interrupt();
                 videoThread.stopGrabber();
                 System.out.println("Closed");
                 e.getWindow().dispose();
@@ -75,7 +80,6 @@ public class VideoPlayer extends CanvasFrame {
 
                         case VK_X:
                             timeStamps.add(videoThread.getCurrentTimeStamp());
-                            getGraphics().drawString("" + timeStamps.size(), 10, 10);
                             System.out.println("Added new timestamp " + timeStamps.size());
                             break;
 
@@ -92,5 +96,9 @@ public class VideoPlayer extends CanvasFrame {
                 throw new RuntimeException(e);
             }
         }).start();
+    }
+
+    protected int currentSegments() {
+        return timeStamps.size();
     }
 }

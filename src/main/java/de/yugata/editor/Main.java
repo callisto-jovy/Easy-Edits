@@ -9,6 +9,8 @@ import org.bytedeco.javacv.FFmpegLogCallback;
 import org.bytedeco.opencv.opencv_java;
 import picocli.CommandLine;
 
+import java.util.Queue;
+
 public class Main {
 
 
@@ -21,9 +23,12 @@ public class Main {
         final AudioAnalyser audioAnalyser = new AudioAnalyser(cliArgs.getAudioInput());
         audioAnalyser.analyseBeats(cliArgs.getPeakThreshold());
 
+        // Queue of needed beat times
+        final Queue<Double> timeBetweenBeats = audioAnalyser.getTimeBetweenBeats();
+
         // Create the video player & set callback
-        final VideoPlayer videoPlayer = new VideoPlayer(cliArgs.getInput(), (timestamps) -> {
-            final Editor editor = new Editor(cliArgs.getInput(), cliArgs.getAudioInput(), audioAnalyser.getTimeBetweenBeats(), timestamps);
+        final VideoPlayer videoPlayer = new VideoPlayer(cliArgs.getInput(), timeBetweenBeats.size(), (timestamps) -> {
+            final Editor editor = new Editor(cliArgs.getInput(), cliArgs.getAudioInput(), timeBetweenBeats, timestamps);
             editor.edit();
         });
         videoPlayer.run();
