@@ -1,4 +1,4 @@
-package de.yugata.editor.editor;
+package de.yugata.editor.audio;
 
 
 import be.tarsos.dsp.AudioDispatcher;
@@ -19,37 +19,29 @@ import java.util.logging.Logger;
 public class AudioAnalyser {
 
     private static final Logger LOG = Logger.getLogger(AudioAnalyser.class.getName());
-    /**
-     * The input path of the supplied audio. From the given arguments
-     */
-    private final String inputPath;
-    /**
-     * A queue with all the times between the beats which indicate a sequence switch
-     */
-    private final Queue<Double> timeBetweenBeats = new ArrayDeque<>();
 
-    public AudioAnalyser(final String audioInput) {
-        this.inputPath = audioInput;
-        this.validatePath();
-    }
+    public static Queue<Double> analyseBeats(final String audioInput, final double peakThreshold) {
+        validatePath(audioInput);
+
+        final Queue<Double> timeBetweenBeats = new ArrayDeque<>();
 
 
-    public void analyseBeats(final double peakThreshold) {
         // This limits us to AIFF, AU and WAV files only, however, it eliminates the need for the ffmpeg grabber, which reduces code complexity.
-        try (final AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(new File(inputPath))) {
+        try (final AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(new File(audioInput))) {
             final AudioFormat audioFormat = audioInputStream.getFormat();
 
 
             // Sample rate, the buffer's size and overlap between buffers
             final float sampleRate = audioFormat.getSampleRate(); //We get the sample rate from the file
-            final int bufferSize = 2048, // Just hardcoded
-                    bufferOverlap = 0; // We don't need any overlap.
+            final int bufferSize = 512, // Just hardcoded
+                    bufferOverlap = 256; // We don't need any overlap.
 
             // Don't continue from here, just abort.
             if (sampleRate == -1)
                 throw new RuntimeException("Samplerate cannot be negative.");
 
 
+            //
             final JVMAudioInputStream audioStream = new JVMAudioInputStream(audioInputStream);
             final AudioDispatcher dispatcher = new AudioDispatcher(audioStream, bufferSize, bufferOverlap);
 
@@ -60,42 +52,35 @@ public class AudioAnalyser {
             dispatcher.addAudioProcessor(detector);
             dispatcher.run();
 
-            handler.trackBeats((time, salience) -> handleDetection(time));
+            final double[] lastMs = {0};
+
+            handler.trackBeats((timeStamp, salience) -> {
+                final double time = (timeStamp * 1000);
+                final double msPassed = time - lastMs[0];
+
+                timeBetweenBeats.add(msPassed);
+
+                lastMs[0] = time;
+            });
 
 
             LOG.info("We need a total of " + timeBetweenBeats.size() + " segments.");
         } catch (UnsupportedAudioFileException | IOException e) {
             throw new RuntimeException(e);
         }
-    }
 
-    double lastMs = 0;
-
-
-    private void handleDetection(final double timeStamp) {
-        final double time = (timeStamp * 1000);
-        final double msPassed = time - lastMs;
-        timeBetweenBeats.add(msPassed);
-        lastMs = time;
+        return timeBetweenBeats;
     }
 
     /*
      * Checks whether the input exists & creates the output file
      */
-    private void validatePath() {
+    private static void validatePath(final String inputPath) {
         final File inputFile = new File(inputPath);
 
         // Check the input's validity
         if (!inputFile.exists()) {
             throw new IllegalArgumentException("The input file supplied does not exist. Aborting!");
         }
-    }
-
-    public String getInputPath() {
-        return inputPath;
-    }
-
-    public Queue<Double> getTimeBetweenBeats() {
-        return timeBetweenBeats;
     }
 }

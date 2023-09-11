@@ -1,28 +1,61 @@
 package de.yugata.editor.model;
 
-import picocli.CommandLine;
+
+import java.io.File;
+import java.util.function.Function;
 
 public class CLIArgs {
 
 
-    @CommandLine.Option(names = {"--input", "-i"}, required = true)
-    private String input;
+    private static String input;
 
-    @CommandLine.Option(names = {"--audio", "-a"}, required = true)
-    private String audioInput;
+    private static String audioInput;
 
-    @CommandLine.Option(names = {"--peak", "-p"}, defaultValue = "0.2")
-    private double peakThreshold;
+    private static double peakThreshold;
 
-    public String getInput() {
+
+    public static String checkArguments() {
+        if (input == null || input.isEmpty() || !new File(input).exists()) {
+            return "Input file does not exist. Aborting!";
+        }
+
+        if (audioInput == null || audioInput.isEmpty() || !new File(audioInput).exists()) {
+            return "Audio file does not exist. Aborting!";
+        }
+
+        if (peakThreshold <= 0 || peakThreshold >= 1) {
+            return "Peak threshold not in range.";
+        }
+
+        return "";
+    }
+
+    public static boolean audioValid() {
+        return audioInput != null && !audioInput.isEmpty() && new File(audioInput).exists();
+    }
+
+
+    public static String getInput() {
         return input;
     }
 
-    public String getAudioInput() {
+    public static void setInput(String input) {
+        CLIArgs.input = input;
+    }
+
+    public static String getAudioInput() {
         return audioInput;
     }
 
-    public double getPeakThreshold() {
+    public static void setAudioInput(String audioInput) {
+        CLIArgs.audioInput = audioInput;
+    }
+
+    public static double getPeakThreshold() {
         return peakThreshold;
+    }
+
+    public static void setPeakThreshold(double peakThreshold) {
+        CLIArgs.peakThreshold = peakThreshold;
     }
 }
