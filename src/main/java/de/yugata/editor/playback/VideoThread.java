@@ -1,5 +1,7 @@
 package de.yugata.editor.playback;
 
+import de.yugata.editor.editor.Editor;
+import de.yugata.editor.model.CLIArgs;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
@@ -32,7 +34,7 @@ public class VideoThread extends Thread {
     /**
      * The threads internal framegrabber which grabs continuous frames from the provided input-
      */
-    private final FFmpegFrameGrabber frameGrabber;
+    private FFmpegFrameGrabber frameGrabber;
 
     /**
      * The videoplayer this thread attaches to & provides with the current image to show.
@@ -46,15 +48,10 @@ public class VideoThread extends Thread {
     /**
      * Default constructor.
      *
-     * @param videoInput the input to read from
-     * @param parent     the video player to attach to
+     * @param parent the video player to attach to
      */
-    public VideoThread(final String videoInput, final VideoPlayer parent) {
+    public VideoThread(final VideoPlayer parent) {
         this.parent = parent;
-        this.frameGrabber = new FFmpegFrameGrabber(videoInput);
-        frameGrabber.setOption("allowed_extensions", "ALL");
-        frameGrabber.setOption("hwaccel", "cuda");
-        frameGrabber.setVideoCodecName("hevc_cuvid");
     }
 
     /**
@@ -62,6 +59,10 @@ public class VideoThread extends Thread {
      */
     @Override
     public void start() {
+        this.frameGrabber = new FFmpegFrameGrabber(CLIArgs.getInput());
+        frameGrabber.setOption("allowed_extensions", "ALL");
+        frameGrabber.setOption("hwaccel", "cuda");
+        frameGrabber.setVideoCodecName("hevc_cuvid");
         try {
             frameGrabber.start();
         } catch (FFmpegFrameGrabber.Exception e) {
@@ -85,7 +86,7 @@ public class VideoThread extends Thread {
                 final org.opencv.core.Mat coreFrameMat = FRAME_CONVERTER.convertToOrgOpenCvCoreMat(frame);
 
                 // Render the string s to the created mat
-                final String s = "Segments: " + parent.currentSegments() + "; Required: " + parent.requiredSegments;
+                final String s = "Segments: " + Editor.INSTANCE.stamps() + "; Required: " + Editor.INSTANCE.beats();
                 Imgproc.putText(coreFrameMat, s, TEXT_ORIGIN, FONT_HERSHEY_PLAIN, 4, SCALAR_WHITE);
 
                 // Show the image (convert the previously written to mat to a new frame)
@@ -103,10 +104,8 @@ public class VideoThread extends Thread {
                 }
             } // End frame grabbing
             frameGrabber.stop();
-        } catch (FFmpegFrameGrabber.Exception e) {
-            e.printStackTrace();
         } catch (FrameGrabber.Exception e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
         }
     }
 
