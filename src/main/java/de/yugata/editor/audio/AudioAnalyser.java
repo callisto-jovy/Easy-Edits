@@ -20,7 +20,7 @@ public class AudioAnalyser {
 
     private static final Logger LOG = Logger.getLogger(AudioAnalyser.class.getName());
 
-    public static Queue<Double> analyseBeats(final String audioInput, final double peakThreshold) {
+    public static Queue<Double> analyseBeats(final String audioInput, final double peakThreshold, final double msThreshold) {
         validatePath(audioInput);
 
         final Queue<Double> timeBetweenBeats = new ArrayDeque<>();
@@ -46,6 +46,7 @@ public class AudioAnalyser {
             final AudioDispatcher dispatcher = new AudioDispatcher(audioStream, bufferSize, bufferOverlap);
 
 
+            //TODO: Setting
             final ComplexOnsetDetector detector = new ComplexOnsetDetector(bufferSize, peakThreshold);
             final BeatRootOnsetEventHandler handler = new BeatRootOnsetEventHandler();
             detector.setHandler(handler);
@@ -58,9 +59,10 @@ public class AudioAnalyser {
                 final double time = (timeStamp * 1000);
                 final double msPassed = time - lastMs[0];
 
-                timeBetweenBeats.add(msPassed);
-
-                lastMs[0] = time;
+                if (msPassed >= msThreshold) {
+                    timeBetweenBeats.add(msPassed);
+                    lastMs[0] = time;
+                }
             });
 
 

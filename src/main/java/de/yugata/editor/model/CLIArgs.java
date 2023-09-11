@@ -12,6 +12,7 @@ public class CLIArgs {
     private static String audioInput;
 
     private static double peakThreshold;
+    private static double msThreshold;
 
 
     public static String checkArguments() {
@@ -57,5 +58,13 @@ public class CLIArgs {
 
     public static void setPeakThreshold(double peakThreshold) {
         CLIArgs.peakThreshold = peakThreshold;
+    }
+
+    public static double getMsThreshold() {
+        return msThreshold;
+    }
+
+    public static void setMsThreshold(double msThreshold) {
+        CLIArgs.msThreshold = msThreshold;
     }
 }

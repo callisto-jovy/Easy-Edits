@@ -23,7 +23,7 @@ public class Editor {
 
     public void runAudioAnalysis() {
         this.timeBetweenBeats.clear();
-        this.timeBetweenBeats.addAll(AudioAnalyser.analyseBeats(CLIArgs.getAudioInput(), CLIArgs.getPeakThreshold()));
+        this.timeBetweenBeats.addAll(AudioAnalyser.analyseBeats(CLIArgs.getAudioInput(), CLIArgs.getPeakThreshold(), CLIArgs.getMsThreshold()));
     }
 
     public void runEditing() {
