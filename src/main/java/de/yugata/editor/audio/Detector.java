@@ -5,7 +5,6 @@ import be.tarsos.dsp.AudioDispatcher;
 import be.tarsos.dsp.beatroot.BeatRootOnsetEventHandler;
 import be.tarsos.dsp.io.jvm.JVMAudioInputStream;
 import be.tarsos.dsp.onsets.ComplexOnsetDetector;
-import be.tarsos.dsp.onsets.OnsetHandler;
 
 import javax.sound.sampled.*;
 import javax.swing.*;
@@ -18,7 +17,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 
 
-public class Detector extends JFrame implements OnsetHandler {
+public class Detector extends JFrame {
 
     /**
      *
@@ -41,21 +40,23 @@ public class Detector extends JFrame implements OnsetHandler {
         this.setTitle("Percussion Detector");
 
 
-        JSlider sensitivitySlider = initializeSensitivitySlider();
-        JSlider thresholdSlider = initializeThresholdSlider();
-        JPanel params = new JPanel(new GridLayout(0, 1));
+        final JSlider sensitivitySlider = initializeSensitivitySlider();
+        final JSlider thresholdSlider = initializeThresholdSlider();
+        final JPanel params = new JPanel(new GridLayout(0, 1));
         params.setBorder(new TitledBorder("Set the algorithm parameters"));
 
         JLabel label = new JLabel("Threshold");
         label.setToolTipText("Energy rise within a frequency bin necessary to count toward broadband total (dB).");
         params.add(label);
         params.add(thresholdSlider);
-        label = new JLabel("Sensitivity");
-        label.setToolTipText("Sensitivity of peak detector applied to broadband detection function (%).");
+
+        label = new JLabel("Min Intervall (ms)");
+        label.setToolTipText("The minimum time passed between onsets in ms.");
         params.add(label);
         params.add(sensitivitySlider);
 
-        JPanel paramsAndInputPanel = new JPanel(new GridLayout(1, 0));
+
+        final JPanel paramsAndInputPanel = new JPanel(new GridLayout(1, 0));
         paramsAndInputPanel.add(params);
 
 
@@ -83,12 +84,12 @@ public class Detector extends JFrame implements OnsetHandler {
     }
 
     private JSlider initializeSensitivitySlider() {
-        JSlider sensitivitySlider = new JSlider(0, 100);
+        final JSlider sensitivitySlider = new JSlider(0, 5000);
         sensitivitySlider.setValue((int) sensitivity);
         sensitivitySlider.setPaintLabels(true);
         sensitivitySlider.setPaintTicks(true);
-        sensitivitySlider.setMajorTickSpacing(20);
-        sensitivitySlider.setMinorTickSpacing(1);
+        sensitivitySlider.setMajorTickSpacing(100);
+        sensitivitySlider.setMinorTickSpacing(10);
 
         sensitivitySlider.addChangeListener(e -> {
             JSlider source = (JSlider) e.getSource();
@@ -153,16 +154,26 @@ public class Detector extends JFrame implements OnsetHandler {
             detector.setHandler(handler);
             dispatcher.addAudioProcessor(detector);
             dispatcher.run();
-            handler.trackBeats((time, salience) -> {
-                waveForm.addIndicator(time);
-                waveForm.repaint();
+
+
+            final double[] lastMs = {0};
+            handler.trackBeats((timeStamp, salience) -> {
+                final double time = (timeStamp * 1000);
+                final double msPassed = time - lastMs[0];
+
+                if (msPassed >= sensitivity) {
+                    waveForm.addIndicator(timeStamp);
+                    waveForm.repaint();
+
+                    lastMs[0] = time;
+
+                }
             });
 
 
             waveForm.repaint();
 
 
-            System.out.println("sensitivity = " + sensitivity);
             System.out.println("threshold = " + (threshold / 100));
             // run the dispatcher (on a new thread).
             //  new Thread(dispatcher, "Audio dispatching").start();
@@ -185,11 +196,5 @@ public class Detector extends JFrame implements OnsetHandler {
             frame.setSize(640, 480);
             frame.setVisible(true);
         });
-    }
-
-    @Override
-    public void handleOnset(double time, double salience) {
-        // Waveform painting
-        waveForm.addIndicator(time);
     }
 }

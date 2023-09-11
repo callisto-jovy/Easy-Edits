@@ -7,28 +7,30 @@ import org.springframework.shell.command.CommandRegistration;
 import org.springframework.shell.standard.ShellComponent;
 
 @ShellComponent
-public class PeakCommand {
-    private final static String DESCRIPTION = "Specify the audio input.";
+public class MsThresholdCommand {
+
+    //TODO: Description
+    private final static String DESCRIPTION = "The minimum time passed between onsets in ms.";
 
     @Bean
-    public CommandRegistration peak() {
+    public CommandRegistration msThreshold() {
         return CommandRegistration
                 .builder()
-                .command("peak")
+                .command("ms")
                 .withOption()
-                .longNames("peak")
+                .longNames("threshold")
                 .type(Double.class)
                 .required()
-                .defaultValue("0.3")
-                .description("The file path to your audio")
+                .defaultValue("0")
+                .description("The milliseconds that have to pass between beats.")
                 .and()
                 .group("Audio")
                 .description(DESCRIPTION)
                 .withTarget()
                 .function(ctx -> {
-                    final double peak = ctx.getOptionValue("peak");
-                    CLIArgs.setPeakThreshold(peak);
-                    return String.format("Peak threshold set to: %f. Values between 0.1 and 0.8. Default is 0.3, if too many onsets are detected adjust to 0.4 or 0.5 or more.", peak);
+                    final double threshold = ctx.getOptionValue("threshold");
+                    CLIArgs.setMsThreshold(threshold);
+                    return "MS threshold set to: " + threshold;
                 })
                 .and()
                 .build();
