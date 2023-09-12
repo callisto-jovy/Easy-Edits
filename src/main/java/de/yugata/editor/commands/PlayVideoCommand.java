@@ -18,7 +18,7 @@ public class PlayVideoCommand {
     }
 
     public Availability playbackAvailability() {
-        return CLIArgs.checkArguments().isEmpty() ? Availability.available() : Availability.unavailable(CLIArgs.checkArguments());
+        return !CLIArgs.getInput().isEmpty() ? Availability.available() : Availability.unavailable(CLIArgs.checkArguments());
     }
 
 }
