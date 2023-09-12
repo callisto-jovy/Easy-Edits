@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.shell.command.CommandRegistration;
 import org.springframework.shell.standard.ShellComponent;
 
+import java.io.OutputStream;
 import java.util.Arrays;
 
 @ShellComponent
@@ -30,20 +31,24 @@ public class EditingOptionsCommand {
                 .and()
                 .withOption()
                 .longNames("all")
-                .defaultValue("Prints all the available editing flags.")
+                .description("Prints all the available editing flags.")
                 .and()
                 .group("Video")
                 .description(DESCRIPTION)
                 .withTarget()
                 .function(ctx -> {
+
                     if (ctx.hasMappedOption("set")) {
-                        Editor.INSTANCE.addOrRemoveFlag(EditingFlag.valueOf(ctx.getOptionValue("set")));
-                        return String.format("Added flag %s to existing flags!", ctx.getOptionValue("set"));
-                    } else if (ctx.hasMappedOption("all")) {
-                        return Arrays.toString(EditingFlag.values());
+                        final String set = ctx.getOptionValue("set");
+                        Editor.INSTANCE.addOrRemoveFlag(EditingFlag.valueOf(set));
+
+                        return String.format("Added flag %s to existing flags!", set);
                     } else if (ctx.hasMappedOption("see")) {
                         return Editor.INSTANCE.getEditingFlags();
+                    } else if (ctx.hasMappedOption("all")) {
+                        return Arrays.toString(EditingFlag.values());
                     }
+
                     return "Option not found.";
                 })
                 .and()
