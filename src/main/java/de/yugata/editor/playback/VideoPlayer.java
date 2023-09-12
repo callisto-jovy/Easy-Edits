@@ -35,9 +35,17 @@ public class VideoPlayer {
         this.videoCanvas = new VideoCanvas(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                stop();
-                e.getWindow().dispose();
                 super.windowClosing(e);
+
+                if (checkVideoThread()) {
+                    synchronized (videoThread) {
+                        videoThread.interrupt();
+                    }
+                }
+
+                synchronized (keyboardThread) {
+                    keyboardThread.interrupt();
+                }
             }
         });
         this.keyboardThread.start();
@@ -73,10 +81,7 @@ public class VideoPlayer {
     }
 
     public void stop() {
-        if (checkVideoThread())
-            videoThread.interrupt();
-
-        this.keyboardThread.interrupt();
+        videoCanvas.dispose();
     }
 
 
@@ -84,6 +89,4 @@ public class VideoPlayer {
         this.checkCanvas();
         return videoCanvas.waitKey();
     }
-
-
 }

@@ -24,7 +24,6 @@ public class KeyboardThread extends Thread {
             while (!interrupted()) {
                 final KeyEvent key = videoPlayer.waitKey();
 
-
                 switch (key.getKeyCode()) {
 
                     case VK_SPACE:
