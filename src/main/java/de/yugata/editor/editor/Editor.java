@@ -5,10 +5,7 @@ import de.yugata.editor.audio.AudioAnalyser;
 import de.yugata.editor.model.CLIArgs;
 
 import java.io.File;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Queue;
+import java.util.*;
 
 public class Editor {
 
@@ -29,10 +26,15 @@ public class Editor {
      */
     private final File workingDirectory;
 
+    private final EnumSet<EditingFlag> editingFlags;
+
+
     /**
-     * Default constructor, creates an working temp.
+     * Default constructor, creates a working temp.
      */
     public Editor() {
+        this.editingFlags = EnumSet.of(EditingFlag.BEST_QUALITY, EditingFlag.WRITE_HDR_OPTIONS);
+
         this.workingDirectory = new File("editor_temp");
         workingDirectory.mkdir();
     }
@@ -45,6 +47,7 @@ public class Editor {
     public void runAudioAnalysis() {
         this.timeBetweenBeats.clear();
         this.timeBetweenBeats.addAll(AudioAnalyser.analyseBeats(CLIArgs.getAudioInput(), CLIArgs.getPeakThreshold(), CLIArgs.getMsThreshold()));
+        System.out.println("We need a total of " + timeBetweenBeats.size() + " segments.");
     }
 
     /**
@@ -92,7 +95,12 @@ public class Editor {
         return timeStamps.size();
     }
 
-    public File getWorkingDirectory() {
-        return workingDirectory;
+    public void addOrRemoveFlag(final EditingFlag editingFlag) {
+        editingFlags.removeIf(cmp -> cmp == editingFlag);
+        editingFlags.add(editingFlag);
+    }
+
+    public EnumSet<EditingFlag> getEditingFlags() {
+        return editingFlags;
     }
 }
