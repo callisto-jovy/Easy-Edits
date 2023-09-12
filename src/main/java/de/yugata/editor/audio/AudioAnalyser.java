@@ -5,6 +5,7 @@ import be.tarsos.dsp.AudioDispatcher;
 import be.tarsos.dsp.beatroot.BeatRootOnsetEventHandler;
 import be.tarsos.dsp.io.jvm.JVMAudioInputStream;
 import be.tarsos.dsp.onsets.ComplexOnsetDetector;
+import be.tarsos.dsp.onsets.OnsetHandler;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
@@ -21,9 +22,26 @@ public class AudioAnalyser {
     private static final Logger LOG = Logger.getLogger(AudioAnalyser.class.getName());
 
     public static Queue<Double> analyseBeats(final String audioInput, final double peakThreshold, final double msThreshold) {
-        validatePath(audioInput);
-
+        final double[] lastMs = {0};
         final Queue<Double> timeBetweenBeats = new ArrayDeque<>();
+
+        analyseBeats(audioInput, peakThreshold, (timeStamp, salience) -> {
+            final double time = (timeStamp * 1000);
+            final double msPassed = time - lastMs[0];
+
+            if (msPassed >= msThreshold) {
+                timeBetweenBeats.add(msPassed);
+                lastMs[0] = time;
+            }
+        });
+        ;
+
+        return timeBetweenBeats;
+    }
+
+
+    public static void analyseBeats(final String audioInput, final double peakThreshold, final OnsetHandler tracker) {
+        validatePath(audioInput);
 
 
         // This limits us to AIFF, AU and WAV files only, however, it eliminates the need for the ffmpeg grabber, which reduces code complexity.
@@ -53,25 +71,12 @@ public class AudioAnalyser {
             dispatcher.addAudioProcessor(detector);
             dispatcher.run();
 
-            final double[] lastMs = {0};
 
-            handler.trackBeats((timeStamp, salience) -> {
-                final double time = (timeStamp * 1000);
-                final double msPassed = time - lastMs[0];
+            handler.trackBeats(tracker);
 
-                if (msPassed >= msThreshold) {
-                    timeBetweenBeats.add(msPassed);
-                    lastMs[0] = time;
-                }
-            });
-
-
-            LOG.info("We need a total of " + timeBetweenBeats.size() + " segments.");
         } catch (UnsupportedAudioFileException | IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
         }
-
-        return timeBetweenBeats;
     }
 
     /*
