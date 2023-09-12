@@ -1,7 +1,7 @@
 package de.yugata.editor.commands;
 
 
-import de.yugata.editor.audio.Detector;
+import de.yugata.editor.audio.AudioAnalyserUI;
 import de.yugata.editor.model.CLIArgs;
 import org.springframework.shell.Availability;
 import org.springframework.shell.standard.ShellComponent;
@@ -18,7 +18,7 @@ public class DisplayAnalyserCommand {
 
     public void displayAnalyser() {
         try {
-            Detector.displayDetector(CLIArgs.getAudioInput());
+            AudioAnalyserUI.displayDetector(CLIArgs.getAudioInput());
         } catch (InterruptedException | InvocationTargetException e) {
             e.printStackTrace();
         }
