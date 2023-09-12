@@ -36,6 +36,11 @@ public class CLIArgs {
     }
 
 
+    public static boolean inputValid() {
+        return input != null && !input.isEmpty() && new File(input).exists();
+    }
+
+
     public static String getInput() {
         return input;
     }
