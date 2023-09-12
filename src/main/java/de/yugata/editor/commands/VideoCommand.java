@@ -14,7 +14,7 @@ public class VideoCommand {
     public CommandRegistration video() {
         return CommandRegistration
                 .builder()
-                .command("input")
+                .command("video")
                 .withOption()
                 .longNames("set")
                 .type(String.class)
