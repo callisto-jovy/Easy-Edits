@@ -133,7 +133,8 @@ public class VideoEditor {
             final List<FFmpegFrameFilter> videoFilters = new ArrayList<>();
 
             if (flags.contains(EditingFlag.INTERPOLATE_FRAMES)) {
-                final FFmpegFrameFilter interpolateFilter = createVideoFilter("setpts=N,minterpolate=fps=60,tblend=all_mode=average");
+                final FFmpegFrameFilter interpolateFilter = createVideoFilter("minterpolate=fps=60,tblend=all_mode=average");
+                interpolateFilter.start();
                 videoFilters.add(interpolateFilter);
             }
 
@@ -143,6 +144,7 @@ public class VideoEditor {
                 final int fadeOutLength = 4;
                 final int fadeOutStart = (int) ((audioGrabber.getLengthInTime() / 1000000L) - fadeOutLength);
                 final FFmpegFrameFilter videoFadeFilter = createVideoFilter(String.format("fade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength));
+                videoFadeFilter.start();
                 videoFilters.add(videoFadeFilter);
             }
 
@@ -272,10 +274,6 @@ public class VideoEditor {
 
     private void pushToFilters(final Frame frame, final FFmpegFrameRecorder recorder, final FFmpegFrameFilter... filters) {
         try {
-            for (FFmpegFrameFilter filter : filters) {
-                filter.restart();
-            }
-
             // Feed the frame to the first filter
             filters[0].push(frame);
             //
@@ -294,10 +292,6 @@ public class VideoEditor {
             Frame processedFrame;
             while ((processedFrame = finalFilter.pull()) != null) {
                 recorder.record(processedFrame);
-            }
-
-            for (FFmpegFrameFilter filter : filters) {
-                filter.close();
             }
         } catch (FFmpegFrameRecorder.Exception | FrameFilter.Exception e) {
             e.printStackTrace();

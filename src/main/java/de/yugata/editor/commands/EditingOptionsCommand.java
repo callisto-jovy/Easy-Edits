@@ -7,8 +7,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.shell.command.CommandRegistration;
 import org.springframework.shell.standard.ShellComponent;
 
-import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.stream.Collectors;
 
 @ShellComponent
 public class EditingOptionsCommand {
@@ -46,7 +46,9 @@ public class EditingOptionsCommand {
                     } else if (ctx.hasMappedOption("see")) {
                         return Editor.INSTANCE.getEditingFlags();
                     } else if (ctx.hasMappedOption("all")) {
-                        return Arrays.toString(EditingFlag.values());
+                        return Arrays.stream(EditingFlag.values())
+                                .map(editingFlag -> editingFlag.name() + " : " + editingFlag.getDescription())
+                                .collect(Collectors.joining("\n"));
                     }
 
                     return "Option not found.";

@@ -97,7 +97,7 @@ public class Editor {
 
     public void addOrRemoveFlag(final EditingFlag editingFlag) {
         if (editingFlags.contains(editingFlag)) {
-            editingFlags.removeIf(editingFlag1 -> editingFlag1 == editingFlag);
+            editingFlags.remove(editingFlag);
         } else {
             editingFlags.add(editingFlag);
         }
