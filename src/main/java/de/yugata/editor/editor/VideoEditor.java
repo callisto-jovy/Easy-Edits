@@ -115,7 +115,7 @@ public class VideoEditor {
             final int bitrate = 80 * inputVideo.width() * inputVideo.height();
             recorder.setVideoBitrate(Math.max(bitrate, inputVideo.bitrate())); // max bitrate
             recorder.setVideoQuality(0);
-            recorder.setVideoCodecName("h265_nvenc"); // Hardware-accelerated encoding.
+            recorder.setVideoCodecName("h264_nvenc"); // Hardware-accelerated encoding.
 
             recorder.start();
             /* End configuring the recorder */
