@@ -5,6 +5,7 @@ import de.yugata.editor.util.FFmpegUtil;
 import org.bytedeco.ffmpeg.global.avutil;
 import org.bytedeco.javacv.*;
 
+import java.io.File;
 import java.util.List;
 import java.util.Queue;
 
@@ -24,6 +25,9 @@ public class VideoEditor {
      */
     private final String videoPath;
 
+    /**
+     * The audio file's path
+     */
     private final String audioPath;
 
     /**
@@ -31,12 +35,15 @@ public class VideoEditor {
      */
     private InputVideo inputVideo;
 
-    public VideoEditor(final String videoInput, final String audioInput, Queue<Double> timeBetweenBeats, final List<Double> videoTimeStamps) {
+
+    private final File outputFile;
+
+    public VideoEditor(final File outputFile, final String videoInput, final String audioInput, final Queue<Double> timeBetweenBeats, final List<Double> videoTimeStamps) {
         this.videoPath = videoInput;
         this.audioPath = audioInput;
         this.timeBetweenBeats = timeBetweenBeats;
         this.videoTimeStamps = videoTimeStamps;
-
+        this.outputFile = outputFile;
     }
 
     private void initFrameGrabber() {
@@ -83,7 +90,7 @@ public class VideoEditor {
         final double frameTime = 1000 / frameRate;
 
         try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath);
-             final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(videoPath + "_easy_edit.mp4", inputVideo.width(), inputVideo.height(), 2)) {
+             final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(outputFile, inputVideo.width(), inputVideo.height(), 2)) {
 
             // Start grabbing the audio, we need this for the sample rate.
             audioGrabber.start();
@@ -278,10 +285,8 @@ public class VideoEditor {
             for (FFmpegFrameFilter filter : filters) {
                 filter.close();
             }
-        } catch (FFmpegFrameFilter.Exception | FFmpegFrameRecorder.Exception e) {
+        } catch (FFmpegFrameRecorder.Exception | FrameFilter.Exception e) {
             e.printStackTrace();
-        } catch (FrameFilter.Exception e) {
-            throw new RuntimeException(e);
         }
     }
 }
