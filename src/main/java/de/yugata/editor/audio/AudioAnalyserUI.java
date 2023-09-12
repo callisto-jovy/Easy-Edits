@@ -1,15 +1,12 @@
 package de.yugata.editor.audio;
 
 
-import be.tarsos.dsp.AudioDispatcher;
-import be.tarsos.dsp.beatroot.BeatRootOnsetEventHandler;
-import be.tarsos.dsp.io.jvm.JVMAudioInputStream;
-import be.tarsos.dsp.onsets.ComplexOnsetDetector;
-
 import javax.sound.sampled.*;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -17,14 +14,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 
 
-public class Detector extends JFrame {
+public class AudioAnalyserUI extends JFrame {
 
-    /**
-     *
-     */
-    private static final long serialVersionUID = 3501426880288136245L;
-
-    private double sensitivity;
+    private double msThreshold;
     private double threshold;
 
 
@@ -34,9 +26,9 @@ public class Detector extends JFrame {
     // The File selected
     private File audioFile;
 
-    public Detector(final String audioPath) {
+    public AudioAnalyserUI(final String audioPath) {
         this.setLayout(new BorderLayout());
-        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         this.setTitle("Percussion Detector");
 
 
@@ -64,6 +56,15 @@ public class Detector extends JFrame {
         this.add(waveForm = new WaveForm(), BorderLayout.CENTER);
 
         this.addClips(audioPath);
+
+        this.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                System.out.println("msThreshold = " + msThreshold);
+                System.out.println("threshold = " + (threshold / 100));
+                super.windowClosing(e);
+            }
+        });
     }
 
     private JSlider initializeThresholdSlider() {
@@ -74,7 +75,7 @@ public class Detector extends JFrame {
         thresholdSlider.setMajorTickSpacing(1);
         thresholdSlider.setMinorTickSpacing(1);
         thresholdSlider.addChangeListener(e -> {
-            JSlider source = (JSlider) e.getSource();
+            final JSlider source = (JSlider) e.getSource();
             if (!source.getValueIsAdjusting()) {
                 threshold = source.getValue();
                 update();
@@ -85,18 +86,19 @@ public class Detector extends JFrame {
 
     private JSlider initializeSensitivitySlider() {
         final JSlider sensitivitySlider = new JSlider(0, 5000);
-        sensitivitySlider.setValue((int) sensitivity);
+        sensitivitySlider.setValue((int) msThreshold);
         sensitivitySlider.setPaintLabels(true);
         sensitivitySlider.setPaintTicks(true);
         sensitivitySlider.setMajorTickSpacing(100);
         sensitivitySlider.setMinorTickSpacing(10);
 
         sensitivitySlider.addChangeListener(e -> {
-            JSlider source = (JSlider) e.getSource();
+            final JSlider source = (JSlider) e.getSource();
             if (!source.getValueIsAdjusting()) {
-                sensitivity = source.getValue();
+                msThreshold = source.getValue();
                 update();
             }
+
         });
         return sensitivitySlider;
     }
@@ -120,67 +122,28 @@ public class Detector extends JFrame {
             waveForm.clearIndicators();
 
         } catch (UnsupportedAudioFileException | IOException | LineUnavailableException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }
 
-    private AudioDispatcher dispatcher;
 
     private void update() {
-        if (dispatcher != null) {
-            dispatcher.stop();
-        }
-
         waveForm.clearIndicators();
 
-        try {
-            final BufferedInputStream inputStream = new BufferedInputStream(Files.newInputStream(audioFile.toPath()));
-            final AudioInputStream stream = AudioSystem.getAudioInputStream(inputStream);
+        final double[] lastMs = {0};
 
-            final AudioFormat format = stream.getFormat();
+        AudioAnalyser.analyseBeats(audioFile.getAbsolutePath(), threshold / 100, (timeStamp, salience) -> {
+            final double time = (timeStamp * 1000);
+            final double msPassed = time - lastMs[0];
 
-            final float sampleRate = format.getSampleRate();
-            final int bufferSize = 512;
-            final int overlap = 256;
+            if (msPassed >= msThreshold) {
+                waveForm.addIndicator(timeStamp);
+                lastMs[0] = time;
 
+            }
+        });
 
-            final JVMAudioInputStream audioStream = new JVMAudioInputStream(stream);
-            // create a new dispatcher
-            this.dispatcher = new AudioDispatcher(audioStream, bufferSize, overlap);
-
-            final ComplexOnsetDetector detector = new ComplexOnsetDetector(bufferSize, threshold / 100);
-            final BeatRootOnsetEventHandler handler = new BeatRootOnsetEventHandler();
-            detector.setHandler(handler);
-            dispatcher.addAudioProcessor(detector);
-            dispatcher.run();
-
-
-            final double[] lastMs = {0};
-            handler.trackBeats((timeStamp, salience) -> {
-                final double time = (timeStamp * 1000);
-                final double msPassed = time - lastMs[0];
-
-                if (msPassed >= sensitivity) {
-                    waveForm.addIndicator(timeStamp);
-                    waveForm.repaint();
-
-                    lastMs[0] = time;
-
-                }
-            });
-
-
-            waveForm.repaint();
-
-
-            System.out.println("threshold = " + (threshold / 100));
-            // run the dispatcher (on a new thread).
-            //  new Thread(dispatcher, "Audio dispatching").start();
-
-        } catch (IOException | UnsupportedAudioFileException e) {
-            e.printStackTrace();
-        }
+        waveForm.repaint();
     }
 
 
@@ -189,9 +152,9 @@ public class Detector extends JFrame {
             try {
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
             } catch (Exception e) {
-                //ignore failure to set default look en feel;
+                //ignore failure to set default look and feel;
             }
-            JFrame frame = new Detector(audioPath);
+            final JFrame frame = new AudioAnalyserUI(audioPath);
             frame.pack();
             frame.setSize(640, 480);
             frame.setVisible(true);
