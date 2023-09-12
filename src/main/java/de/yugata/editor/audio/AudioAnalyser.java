@@ -19,12 +19,10 @@ import java.util.logging.Logger;
 
 public class AudioAnalyser {
 
-    private static final Logger LOG = Logger.getLogger(AudioAnalyser.class.getName());
-
     public static Queue<Double> analyseBeats(final String audioInput, final double peakThreshold, final double msThreshold) {
-        final double[] lastMs = {0};
         final Queue<Double> timeBetweenBeats = new ArrayDeque<>();
 
+        final double[] lastMs = {0};
         analyseBeats(audioInput, peakThreshold, (timeStamp, salience) -> {
             final double time = (timeStamp * 1000);
             final double msPassed = time - lastMs[0];
@@ -34,11 +32,8 @@ public class AudioAnalyser {
                 lastMs[0] = time;
             }
         });
-        ;
-
         return timeBetweenBeats;
     }
-
 
     public static void analyseBeats(final String audioInput, final double peakThreshold, final OnsetHandler tracker) {
         validatePath(audioInput);
@@ -70,7 +65,6 @@ public class AudioAnalyser {
             detector.setHandler(handler);
             dispatcher.addAudioProcessor(detector);
             dispatcher.run();
-
 
             handler.trackBeats(tracker);
 
