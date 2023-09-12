@@ -27,23 +27,5 @@ public class EditorApp {
                 .headless(false);
 
         final ConfigurableApplicationContext context = builder.run(args);
-        /*
-
-        final CLIArgs cliArgs = CommandLine.populateSpec(CLIArgs.class, args);
-        //Analyse the audio
-        final AudioAnalyser audioAnalyser = new AudioAnalyser(cliArgs.getAudioInput());
-        audioAnalyser.analyseBeats(cliArgs.getPeakThreshold());
-
-        // Queue of needed beat times
-        final Queue<Double> timeBetweenBeats = audioAnalyser.getTimeBetweenBeats();
-
-        // Create the video player & set callback
-        final VideoPlayer videoPlayer = new VideoPlayer(cliArgs.getInput(), timeBetweenBeats.size(), (timestamps) -> {
-            final Editor editor = new Editor(cliArgs.getInput(), cliArgs.getAudioInput(), timeBetweenBeats, timestamps);
-            editor.edit();
-        });
-        videoPlayer.run();
-
-         */
     }
 }
