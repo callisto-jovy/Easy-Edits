@@ -243,9 +243,9 @@ public class VideoEditor {
             }
 
             // Close the frame filters, to avoid endless try-catch hell
-
-            //        videoFade.close();
-            //      fadeOutAudioFilter.close();
+            for (final FFmpegFrameFilter videoFilter : videoFilters) {
+                videoFilter.close();
+            }
         } catch (FrameRecorder.Exception | FrameGrabber.Exception | FrameFilter.Exception e) {
             e.printStackTrace();
         }
