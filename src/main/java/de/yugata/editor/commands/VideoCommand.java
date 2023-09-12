@@ -24,7 +24,7 @@ public class VideoCommand {
                 .longNames("path")
                 .description("The current video file path.")
                 .and()
-                .group("Input")
+                .group("Video")
                 .description(DESCRIPTION)
                 .withTarget()
                 .function(ctx -> {

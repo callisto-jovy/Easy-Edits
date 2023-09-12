@@ -19,7 +19,6 @@ public class EditorApp {
     public static void main(String... args) {
         Loader.load(opencv_java.class);
         Loader.load(ffmpeg.class);
-
         FFmpegLogCallback.set();
 
         final SpringApplicationBuilder builder = new SpringApplicationBuilder(EditorApp.class)
