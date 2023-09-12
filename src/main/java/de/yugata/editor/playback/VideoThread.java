@@ -45,6 +45,9 @@ public class VideoThread extends Thread {
      */
     private boolean paused;
 
+    private long startTime = 0;
+
+
     /**
      * Default constructor.
      *
@@ -59,7 +62,17 @@ public class VideoThread extends Thread {
      */
     @Override
     public void start() {
-        this.frameGrabber = new FFmpegFrameGrabber(CLIArgs.getInput());
+        this.frameGrabber = new FFmpegFrameGrabber(CLIArgs.getInput()) {
+            // We have to overwrite this method for the grabbing to work correctly.
+            @Override
+            public Frame grabAtFrameRate() throws FrameGrabber.Exception, InterruptedException {
+                final Frame frame = grabImage();
+                if (frame != null) {
+                    waitForTimestamp(frame);
+                }
+                return frame;
+            }
+        };
         frameGrabber.setOption("allowed_extensions", "ALL");
         frameGrabber.setOption("hwaccel", "cuda");
         frameGrabber.setVideoCodecName("hevc_cuvid");
@@ -71,14 +84,13 @@ public class VideoThread extends Thread {
         super.start();
     }
 
-
     @Override
     public void run() {
         super.run();
         try {
             /* Grab frames until there are no more or the thread has been interrupted */
             Frame frame;
-            while ((frame = frameGrabber.grab()) != null && !interrupted()) {
+            while ((frame = frameGrabber.grabAtFrameRate()) != null && !interrupted()) {
                 if (frame.image == null)
                     continue;
 
@@ -95,16 +107,12 @@ public class VideoThread extends Thread {
                 // Wait if the thread is paused, needs to sync the thread.
                 synchronized (this) {
                     if (paused) {
-                        try {
-                            wait();
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
+                        wait();
                     }
                 }
             } // End frame grabbing
-            frameGrabber.stop();
-        } catch (FrameGrabber.Exception e) {
+            frameGrabber.close();
+        } catch (FrameGrabber.Exception | InterruptedException e) {
             e.printStackTrace();
         }
     }
@@ -135,6 +143,7 @@ public class VideoThread extends Thread {
     public void seek(final long amount) {
         try {
             frameGrabber.setTimestamp(frameGrabber.getTimestamp() + amount);
+            frameGrabber.resetStartTime();
         } catch (FFmpegFrameGrabber.Exception ex) {
             throw new RuntimeException(ex);
         }
