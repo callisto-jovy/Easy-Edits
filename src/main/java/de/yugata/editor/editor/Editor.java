@@ -65,7 +65,7 @@ public class Editor {
         final File outputFile = new File(workingDirectory, inputFile.getName() + "_edit.mp4");
 
         final VideoEditor editor = new VideoEditor(outputFile, CLIArgs.getInput(), CLIArgs.getAudioInput(), timeBetweenBeats, timeStamps);
-        editor.edit();
+        editor.edit(editingFlags);
     }
 
     /**
@@ -96,8 +96,11 @@ public class Editor {
     }
 
     public void addOrRemoveFlag(final EditingFlag editingFlag) {
-        editingFlags.removeIf(cmp -> cmp == editingFlag);
-        editingFlags.add(editingFlag);
+        if (editingFlags.contains(editingFlag)) {
+            editingFlags.removeIf(editingFlag1 -> editingFlag1 == editingFlag);
+        } else {
+            editingFlags.add(editingFlag);
+        }
     }
 
     public EnumSet<EditingFlag> getEditingFlags() {
