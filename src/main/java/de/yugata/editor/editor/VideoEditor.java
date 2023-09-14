@@ -274,6 +274,12 @@ public class VideoEditor {
 
     private void pushToFilters(final Frame frame, final FFmpegFrameRecorder recorder, final FFmpegFrameFilter... filters) {
         try {
+            if (filters.length == 0) {
+                recorder.record(frame);
+                return;
+            }
+
+
             // Feed the frame to the first filter
             filters[0].push(frame);
             //
