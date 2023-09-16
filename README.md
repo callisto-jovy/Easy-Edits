@@ -14,7 +14,7 @@ After the beat, the next sequence is started, & the next timestamp is used as a 
 * Hw-accelerated rendering.
 * Inbuilt rendering options, such as fade-out, frame interpolation, etc.
 
-## Possible caviats 
+## Possible caveats  
 As this program has been developed for a very short time and is an open-sourced in-house tool, certain specifics may not work with your input.
 Reading the provided output log is helpful; video codecs might have to be changed, depending on your input.
 If you don't know what you are doing, I would advise you to a) wait for a more polished version or b) wait for a binary release. If you still feel frisky and the setup or something else does not work, feel free to open up an issue.
