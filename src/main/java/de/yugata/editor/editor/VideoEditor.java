@@ -2,14 +2,12 @@ package de.yugata.editor.editor;
 
 import de.yugata.editor.model.InputVideo;
 import de.yugata.editor.util.FFmpegUtil;
+import de.yugata.editor.util.ListUtil;
 import org.bytedeco.ffmpeg.global.avutil;
 import org.bytedeco.javacv.*;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Queue;
+import java.util.*;
 
 public class VideoEditor {
 
@@ -90,6 +88,10 @@ public class VideoEditor {
         final double frameRate = inputVideo.frameRate();
         // The time one frame takes in ms.
         final double frameTime = 1000 / frameRate;
+
+        if(flags.contains(EditingFlag.SHUFFLE_SEQUENCES)) {
+            Collections.shuffle(videoTimeStamps);
+        }
 
         try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath);
              final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(outputFile, inputVideo.width(), inputVideo.height(), 2)) {
