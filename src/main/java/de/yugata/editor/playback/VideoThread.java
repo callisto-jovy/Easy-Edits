@@ -152,4 +152,13 @@ public class VideoThread extends Thread {
     public double getCurrentTimeStamp() {
         return frameGrabber.getTimestamp();
     }
+
+    public void setTimeStamp(long l) {
+        try {
+            frameGrabber.setTimestamp(l);
+            frameGrabber.resetStartTime();
+        } catch (FFmpegFrameGrabber.Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
 }

@@ -7,8 +7,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.shell.command.CommandRegistration;
 import org.springframework.shell.standard.ShellComponent;
 
+import javax.swing.text.html.ListView;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @ShellComponent
 public class EditingOptionsCommand {
