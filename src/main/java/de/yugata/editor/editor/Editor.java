@@ -48,6 +48,7 @@ public class Editor {
         this.timeBetweenBeats.clear();
         this.timeBetweenBeats.addAll(AudioAnalyser.analyseBeats(CLIArgs.getAudioInput(), CLIArgs.getPeakThreshold(), CLIArgs.getMsThreshold()));
         System.out.println("We need a total of " + timeBetweenBeats.size() + " segments.");
+        System.out.println("Avg. time between beats (ms): " + timeBetweenBeats.stream().reduce(Double::sum).orElse(0d) / timeBetweenBeats.size());
     }
 
     /**
