@@ -86,8 +86,8 @@ public class Editor {
         for (int i = 0; i < timeStamps.size(); i++) {
             if (timeStamps.get(i) == null) {
                 timeStamps.set(i, stamp);
+                return;
             }
-            return;
         }
 
         this.timeStamps.add(stamp);
