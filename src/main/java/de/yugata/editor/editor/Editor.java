@@ -14,7 +14,7 @@ public class Editor {
     /**
      * A queue with all the time's between the beats. Supplied from the audio analyser after the analysis is done.
      */
-    private final Queue<Double> timeBetweenBeats = new ArrayDeque<>();
+    private final List<Double> timeBetweenBeats = new ArrayList<>();
 
     /**
      * A List with all the user's time stamps.
@@ -65,7 +65,10 @@ public class Editor {
         final File inputFile = new File(CLIArgs.getInput());
         final File outputFile = new File(workingDirectory, inputFile.getName() + "_edit.mp4");
 
-        final VideoEditor editor = new VideoEditor(outputFile, CLIArgs.getInput(), CLIArgs.getAudioInput(), timeBetweenBeats, timeStamps);
+        final Queue<Double> queue = new ArrayDeque<>();
+        queue.addAll(timeBetweenBeats);
+
+        final VideoEditor editor = new VideoEditor(outputFile, CLIArgs.getInput(), CLIArgs.getAudioInput(), queue, timeStamps);
         editor.edit(editingFlags);
     }
 
@@ -79,7 +82,21 @@ public class Editor {
     }
 
     public void addTimeStamp(final double stamp) {
+        //THIS IS for functionality with the new editor ui. Any open spot created by whatsoever will be filled.
+        for (int i = 0; i < timeStamps.size(); i++) {
+            if (timeStamps.get(i) == null) {
+                timeStamps.set(i, stamp);
+            }
+            return;
+        }
+
         this.timeStamps.add(stamp);
+    }
+
+    public void removeStampAt(final int index) {
+        if (index >= 0 && index <= timeStamps.size()) {
+            timeStamps.set(index, null);
+        }
     }
 
     public void removeLastTimeStamp() {
@@ -94,6 +111,13 @@ public class Editor {
 
     public int stamps() {
         return timeStamps.size();
+    }
+
+    public double timeStampAt(final int index) {
+        if (index > timeStamps.size() || index < 0) {
+            return -1;
+        }
+        return timeStamps.get(index);
     }
 
     public void addOrRemoveFlag(final EditingFlag editingFlag) {

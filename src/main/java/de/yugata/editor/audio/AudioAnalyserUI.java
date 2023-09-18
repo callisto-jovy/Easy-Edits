@@ -37,14 +37,14 @@ public class AudioAnalyserUI extends JFrame {
         final JPanel params = new JPanel(new GridLayout(0, 1));
         params.setBorder(new TitledBorder("Set the algorithm parameters"));
 
-        JLabel label = new JLabel("Threshold");
-        label.setToolTipText("Energy rise within a frequency bin necessary to count toward broadband total (dB).");
-        params.add(label);
+        final JLabel thresholdLabel = new JLabel("Threshold");
+        thresholdLabel.setToolTipText("Energy rise within a frequency bin necessary to count toward broadband total (dB).");
+        params.add(thresholdLabel);
         params.add(thresholdSlider);
 
-        label = new JLabel("Min Intervall (ms)");
-        label.setToolTipText("The minimum time passed between onsets in ms.");
-        params.add(label);
+        final JLabel intervalLabel = new JLabel("Min Intervall (ms)");
+        intervalLabel.setToolTipText("The minimum time passed between onsets in ms.");
+        params.add(intervalLabel);
         params.add(sensitivitySlider);
 
 

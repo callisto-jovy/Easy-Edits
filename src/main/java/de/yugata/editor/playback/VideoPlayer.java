@@ -50,6 +50,11 @@ public class VideoPlayer {
         });
         this.keyboardThread.start();
         this.videoThread.start();
+
+    }
+
+    public boolean isRunning() {
+        return videoCanvas.isShowing() && keyboardThread.isAlive() && videoThread.isAlive();
     }
 
     private boolean checkVideoThread() {
@@ -78,6 +83,11 @@ public class VideoPlayer {
         if (checkVideoThread())
 
             videoThread.seek(l);
+    }
+
+    public void setTimeStamp(long l) {
+        if (checkVideoThread())
+            videoThread.setTimeStamp(l);
     }
 
     public void stop() {
