@@ -90,12 +90,6 @@ public class VideoEditor {
         // Write the segment files that will be stitched together.
         final List<File> segments = this.writeSegments(flags);
 
-        // The videos framerate
-        final double frameRate = inputVideo.frameRate();
-        // The time one frame takes in ms.
-        final double frameTime = 1000 / frameRate;
-
-
         // Recorder for the final product & audio grabber to overlay the audio
         try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath);
              final FFmpegFrameRecorder recorder = getRecorder(outputFile, flags)) {
@@ -107,10 +101,9 @@ public class VideoEditor {
 
             this.initFrameGrabber();
             this.frameGrabber.setTimestamp(introStart);
-            recorder.setTimestamp(0);
 
             Frame introFrame;
-            while ((introFrame = frameGrabber.grab()) != null && (frameGrabber.getTimestamp() < introEnd)) {
+            while ((introFrame = frameGrabber.grab()) != null && frameGrabber.getTimestamp() < introEnd) {
                 recorder.record(introFrame);
             }
 
@@ -146,12 +139,6 @@ public class VideoEditor {
             // Array with all our video filters. This is needed for the pushToFilters method. Otherwise, the filters would be a new array every time.
             // This is just how java works.
             final FFmpegFrameFilter[] videoFiltersArray = videoFilters.toArray(new FFmpegFrameFilter[]{});
-
-
-            // The blur transition
-            FFmpegFrameFilter hBlurTransition = null;
-
-            //100ms
 
             for (final File segment : segments) {
                 final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(segment);
