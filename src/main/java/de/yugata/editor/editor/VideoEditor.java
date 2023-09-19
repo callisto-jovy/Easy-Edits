@@ -2,11 +2,11 @@ package de.yugata.editor.editor;
 
 import de.yugata.editor.model.InputVideo;
 import de.yugata.editor.util.FFmpegUtil;
-import de.yugata.editor.util.ListUtil;
 import org.bytedeco.ffmpeg.global.avutil;
 import org.bytedeco.javacv.*;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 
 public class VideoEditor {
@@ -43,7 +43,11 @@ public class VideoEditor {
         this.audioPath = audioInput;
         this.timeBetweenBeats = timeBetweenBeats;
         this.videoTimeStamps = videoTimeStamps;
-        this.outputFile = outputFile;
+        if (outputFile.exists()) {
+            this.outputFile = new File(outputFile.getParent(), UUID.randomUUID() + outputFile.getName());
+        } else {
+            this.outputFile = outputFile;
+        }
     }
 
     private void initFrameGrabber() {
@@ -55,8 +59,8 @@ public class VideoEditor {
                         frameGrabber.getImageHeight(),
                         frameGrabber.getFrameRate(),
                         frameGrabber.getVideoCodec(),
-                        frameGrabber.getVideoBitrate()
-                );
+                        frameGrabber.getVideoBitrate(),
+                        frameGrabber.getSampleRate());
 
             } catch (FFmpegFrameGrabber.Exception e) {
                 throw new RuntimeException(e);
@@ -82,70 +86,34 @@ public class VideoEditor {
         }
     }
 
-    public void edit(final EnumSet<EditingFlag> flags) {
-        this.initFrameGrabber();
-        // The videos framerate
-        final double frameRate = inputVideo.frameRate();
-        // The time one frame takes in ms.
-        final double frameTime = 1000 / frameRate;
+    public void edit(final EnumSet<EditingFlag> flags, final int introStart, final int introEnd) {
+        // Write the segment files that will be stitched together.
+        final List<File> segments = this.writeSegments(flags);
 
-        if(flags.contains(EditingFlag.SHUFFLE_SEQUENCES)) {
-            Collections.shuffle(videoTimeStamps);
-        }
-
+        // Recorder for the final product & audio grabber to overlay the audio
         try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath);
-             final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(outputFile, inputVideo.width(), inputVideo.height(), 2)) {
+             final FFmpegFrameRecorder recorder = getRecorder(outputFile, flags);) {
 
             // Start grabbing the audio, we need this for the sample rate.
             audioGrabber.start();
 
 
-            /* Configure the recorder */
-            recorder.setFormat("mp4");
-
-            // Preserve the color range for the HDR video files.
-            // This lets us tone-map the hdr content later on if we want to.
-            //TODO: get this from the grabber
-            if (flags.contains(EditingFlag.WRITE_HDR_OPTIONS)) {
-                recorder.setVideoOption("color_range", "tv");
-                recorder.setVideoOption("colorspace", "bt2020nc");
-                recorder.setVideoOption("color_primaries", "bt2020");
-                recorder.setVideoOption("color_trc", "smpte2084");
-            }
-
-            if (flags.contains(EditingFlag.BEST_QUALITY))
-                recorder.setVideoQuality(0); // best quality --> Produces big files
-
-            // One of the pixel formats supported by h264 nvenc
-            recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
-            recorder.setFrameRate(inputVideo.frameRate());
-            recorder.setSampleRate(frameGrabber.getSampleRate());
-            // Select the "highest" bitrate. If the video has a lower bitrate than HD, we just set it to hd.
-            final int bitrate = 80 * inputVideo.width() * inputVideo.height();
-            recorder.setVideoBitrate(Math.max(bitrate, inputVideo.bitrate())); // max bitrate
-            recorder.setVideoCodecName("h264_nvenc"); // Hardware-accelerated encoding.
-
-            recorder.start();
-            /* End configuring the recorder */
-
             /* Configuring the video filters */
-
-            //TODO: Find out why javacv is retarded
 
             final List<FFmpegFrameFilter> videoFilters = new ArrayList<>();
 
             if (flags.contains(EditingFlag.INTERPOLATE_FRAMES)) {
-                final FFmpegFrameFilter interpolateFilter = createVideoFilter("minterpolate=fps=60,tblend=all_mode=average");
+                final String videoFilter = String.format("minterpolate=fps=%d,tblend=all_mode=average", EditingFlag.INTERPOLATE_FRAMES.getSetting());
+
+                final FFmpegFrameFilter interpolateFilter = createVideoFilter(videoFilter, 0);
                 interpolateFilter.start();
                 videoFilters.add(interpolateFilter);
             }
 
             if (flags.contains(EditingFlag.FADE_OUT_VIDEO)) {
-                //TODO: THIS SHOULD BE A SETTING
-                // for now, we just fade out for the last four seconds.
-                final int fadeOutLength = 4;
+                final int fadeOutLength = EditingFlag.FADE_OUT_VIDEO.getSetting();
                 final int fadeOutStart = (int) ((audioGrabber.getLengthInTime() / 1000000L) - fadeOutLength);
-                final FFmpegFrameFilter videoFadeFilter = createVideoFilter(String.format("fade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength));
+                final FFmpegFrameFilter videoFadeFilter = createVideoFilter(String.format("fade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength), 0);
                 videoFadeFilter.start();
                 videoFilters.add(videoFadeFilter);
             }
@@ -159,82 +127,72 @@ public class VideoEditor {
             // This is just how java works.
             final FFmpegFrameFilter[] videoFiltersArray = videoFilters.toArray(new FFmpegFrameFilter[]{});
 
-            /* End filters */
 
-            int nextStamp = 0;
+            // This filter is an anomaly. We have to have it here, as we need the offset
+            // Maybe we need to add the offset
+            FFmpegFrameFilter hBlurTransition = null;
+
+            for (int i = 0; i < segments.size(); i++) {
+                final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(segments.get(i));
+                segmentGrabber.setOption("allowed_extensions", "ALL");
+                segmentGrabber.setOption("hwaccel", "cuda");
+                segmentGrabber.setVideoCodecName("h264_cuvid");
+                segmentGrabber.start();
 
 
-            /* Needed for transitions, I have to fix this Clusterfuck someday */
-            Frame lastFrame = null;
-            /* Beat loop */
-            while (timeBetweenBeats.peek() != null) {
-                final double timeBetween = timeBetweenBeats.poll();
+                // Only create a new blur transition whenever the sequence has a successor
 
-                // If the next stamp (index in the list) is valid, we move to the timestamp.
-                // If not, we just keep recording, until no beat times are left
-                // This is nice to have for ending sequences, where a last sequence is displayed for x seconds.
+                if (hBlurTransition != null) {
+                    double frames = 0;
 
-                long filterStamp = -1;
-                if (nextStamp < videoTimeStamps.size()) {
-                    final double timeStamp = videoTimeStamps.get(nextStamp);
-                    frameGrabber.setTimestamp((long) timeStamp);
 
-                    filterStamp = frameGrabber.getTimestamp();
-                }
-
-                // This filter is an anomaly. We have to have it here, as we need the offset
-                // Maybe we need to add the offset
-                //      final FFmpegFrameFilter hBlurTransition = createVideoFilter(String.format("[0:v][1:v]xfade=transition=hblur:duration=%sms:offset=%sms[v],[v]setpts=N[v]", 15, filterStamp));
-                //      hBlurTransition.setVideoInputs(2);
-                //      hBlurTransition.start();
-
-                // Time passed in frame times.xxx
-                double localMs = 0;
-
-                // Pick frames till the interim is filled...
-                Frame frame;
-                while ((frame = frameGrabber.grabImage()) != null && localMs < timeBetween) {
-
-                    pushToFilters(frame, recorder, videoFiltersArray);
-
-                    /*
-                    // This is fucking stupid
-                    if (filterStamp != -1 && lastFrame != null) {
-                        hBlurTransition.push(0, lastFrame);
-                        hBlurTransition.push(1, frame);
-
-                        Frame processedFrame;
-                        while ((processedFrame = hBlurTransition.pull()) != null) {
-                            recorder.record(processedFrame);
-                        }
-
-                        hBlurTransition.close();
-                        lastFrame.close();
-                        lastFrame = null;
-                    } else {
-                        pushToFilters(frame, recorder, videoFilters);
+                    // Push frames to the hblur until we have a full second of frames
+                    Frame videoFrame;
+                    while ((videoFrame = segmentGrabber.grabImage()) != null && frames <= 120) {
+                        hBlurTransition.push(1, videoFrame);
+                        frames++;
                     }
 
-                     */
+                    // Grab from hblur
 
-                    localMs += frameTime;
+                    while ((videoFrame = hBlurTransition.pull()) != null) {
+                        recorder.record(videoFrame, hBlurTransition.getPixelFormat());
+                    }
+
+                    segmentGrabber.setTimestamp(0);
+
+                    // Reset the transition
+                    hBlurTransition.close();
                 }
 
-                /*
-                // We copy the last frame after a sequence is finished, in order to transition between the last frame and the first frame
-                if (frame != null) // Just for safety reasons
-                    lastFrame = frame.clone();
 
-                 */
-                // Advance to the next timestamp.
-                nextStamp++;
+                // grab the frames & send them to the filters
+
+                Frame videoFrame;
+                while ((videoFrame = segmentGrabber.grabImage()) != null) {
+                    pushToFilters(videoFrame, recorder, videoFiltersArray);
+                }
+
+
+                hBlurTransition = new FFmpegFrameFilter(String.format("[0:v][1:v]xfade=transition=hblur:duration=%s:offset=%sus[v],[v]setpts=N[v]", 1, recorder.getTimestamp() - 1000000L), inputVideo.width(), inputVideo.height());
+                hBlurTransition.setFrameRate(inputVideo.frameRate());
+                hBlurTransition.setPixelFormat(segmentGrabber.getPixelFormat());
+                hBlurTransition.setVideoInputs(2);
+                hBlurTransition.start();
+
+
+                // Seek 1 second back
+                segmentGrabber.setTimestamp(segmentGrabber.getTimestamp() - 2000000L);
+
+                // Push frames to blur filter
+                while ((videoFrame = segmentGrabber.grabImage()) != null) {
+                    hBlurTransition.push(0, videoFrame);
+                }
+
+
+                // Close the grabber, release the resources
+                segmentGrabber.close();
             }
-            /* End beat loop */
-
-            this.releaseFrameGrabber();
-
-
-            //final FFmpegFrameFilter fadeOutAudioFilter = createAudioFilter(String.format("afade=t=out:st=%d:d=%d", fadeOutStart, fadeOutLength));
 
 
             // Overlay the audio
@@ -244,25 +202,128 @@ public class VideoEditor {
                 recorder.record(audioFrame);
             }
 
-            // Close the frame filters, to avoid endless try-catch hell
+            //TODO: add the intro
+
+
+            /* Clean up resources */
+
             for (final FFmpegFrameFilter videoFilter : videoFilters) {
                 videoFilter.close();
             }
+
         } catch (FrameRecorder.Exception | FrameGrabber.Exception | FrameFilter.Exception e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
     }
 
+    private List<File> writeSegments(final EnumSet<EditingFlag> flags) {
+        this.initFrameGrabber();
 
-    private FFmpegFrameFilter createVideoFilter(final String videoFilter) throws FFmpegFrameFilter.Exception {
-        if (frameGrabber == null)
-            return null;
+        //TODO: We could just read the files in the dir & sort them based on their name?
+        final List<File> segmentFiles = new ArrayList<>();
 
-        final FFmpegFrameFilter videoFrameFilter = new FFmpegFrameFilter(videoFilter, frameGrabber.getImageWidth(), frameGrabber.getImageHeight());
-        videoFrameFilter.setFrameRate(frameGrabber.getFrameRate());
-        videoFrameFilter.setPixelFormat(frameGrabber.getPixelFormat());
+
+        // The videos framerate
+        final double frameRate = inputVideo.frameRate();
+        // The time one frame takes in ms.
+        final double frameTime = 1000 / frameRate;
+
+        if (flags.contains(EditingFlag.SHUFFLE_SEQUENCES)) {
+            Collections.shuffle(videoTimeStamps);
+        }
+
+        try {
+            int nextStamp = 0;
+
+            /* Beat loop */
+            while (timeBetweenBeats.peek() != null) {
+                final double timeBetween = timeBetweenBeats.poll();
+
+                // If the next stamp (index in the list) is valid, we move to the timestamp.
+                // If not, we just keep recording, until no beat times are left
+                // This is nice to have for ending sequences, where a last sequence is displayed for x seconds.
+
+                if (nextStamp < videoTimeStamps.size()) {
+                    final double timeStamp = videoTimeStamps.get(nextStamp);
+                    frameGrabber.setTimestamp((long) timeStamp);
+                }
+
+                // Write a new segment to disk
+                final File segmentFile = File.createTempFile(String.format("segment %d", nextStamp), ".mp4", Editor.WORKING_DIRECTORY);
+                segmentFiles.add(segmentFile); // Add the file to the segments.
+                final FFmpegFrameRecorder recorder = getRecorder(segmentFile, flags);
+
+                // Time passed in frame times.
+                double localMs = 0;
+
+                // Pick frames till the interim is filled...
+                Frame frame;
+                while ((frame = frameGrabber.grabImage()) != null && localMs < timeBetween) {
+
+                    recorder.record(frame);
+                    localMs += frameTime;
+                }
+
+                // Close our local recorder.
+                recorder.close();
+                // Advance to the next timestamp.
+                nextStamp++;
+            }
+            /* End beat loop */
+
+            this.releaseFrameGrabber();
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        return segmentFiles;
+    }
+
+
+    private FFmpegFrameRecorder getRecorder(final File outputFile, final EnumSet<EditingFlag> flags) throws FFmpegFrameRecorder.Exception {
+        final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(outputFile, inputVideo.width(), inputVideo.height(), 2);
+
+        recorder.setFormat("mp4");
+
+        // Preserve the color range for the HDR video files.
+        // This lets us tone-map the hdr content later on if we want to.
+        //TODO: get this from the grabber
+        if (flags.contains(EditingFlag.WRITE_HDR_OPTIONS)) {
+            recorder.setVideoOption("color_range", "tv");
+            recorder.setVideoOption("colorspace", "bt2020nc");
+            recorder.setVideoOption("color_primaries", "bt2020");
+            recorder.setVideoOption("color_trc", "smpte2084");
+        }
+
+        if (flags.contains(EditingFlag.BEST_QUALITY)) {
+            recorder.setVideoQuality(EditingFlag.BEST_QUALITY.getSetting()); // best quality --> Produces big files
+            recorder.setOption("cq", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
+        }
+
+
+        // One of the pixel formats supported by h264 nvenc
+        recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
+        recorder.setFrameRate(inputVideo.frameRate());
+        recorder.setSampleRate(inputVideo.sampleRate());
+        // Select the "highest" bitrate. If the video has a lower bitrate than HD, we just set it to hd.
+        final int bitrate = 120 * inputVideo.width() * inputVideo.height();
+        recorder.setVideoBitrate(Math.max(bitrate, inputVideo.bitrate())); // max bitrate
+        recorder.setVideoCodecName("h264_nvenc"); // Hardware-accelerated encoding.
+
+        recorder.start();
+
+        return recorder;
+    }
+
+
+    private FFmpegFrameFilter createVideoFilter(final String videoFilter, final int pixelFormat) throws FFmpegFrameFilter.Exception {
+        final FFmpegFrameFilter videoFrameFilter = new FFmpegFrameFilter(videoFilter, inputVideo.width(), inputVideo.height());
+        videoFrameFilter.setFrameRate(inputVideo.frameRate());
+        videoFrameFilter.setPixelFormat(pixelFormat);
         return videoFrameFilter;
     }
+
 
     private FFmpegFrameFilter createAudioFilter(final String audioFilter) {
         try (final FFmpegFrameFilter audioFrameFilter = new FFmpegFrameFilter(audioFilter, 2)) {

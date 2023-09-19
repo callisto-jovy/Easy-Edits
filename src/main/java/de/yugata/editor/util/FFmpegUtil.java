@@ -6,8 +6,9 @@ import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.FFmpegLogCallback;
 import org.bytedeco.opencv.opencv_java;
 
-public class FFmpegUtil {
+import java.io.File;
 
+public class FFmpegUtil {
 
 
     public static FFmpegFrameGrabber createGrabber(final String filePath) throws FFmpegFrameGrabber.Exception {
@@ -18,6 +19,4 @@ public class FFmpegUtil {
         frameGrabber.start();
         return frameGrabber;
     }
-
-
 }
