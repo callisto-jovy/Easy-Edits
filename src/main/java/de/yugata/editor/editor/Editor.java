@@ -27,7 +27,11 @@ public class Editor {
     /**
      * The application's working directory.
      */
-    private final File workingDirectory;
+    public static final File WORKING_DIRECTORY = new File("editor_temp");
+
+    static {
+        WORKING_DIRECTORY.mkdir();
+    }
 
     /**
      * An Enumset with the {@link EditingFlag} that will be passed to the editor
@@ -37,14 +41,15 @@ public class Editor {
 
     /* Editor settings */
 
+    //TODO: move to editing flags
+    private int introStart = -1, intoEnd = -1;
+
+
     /**
      * Default constructor, creates a working temp.
      */
     public Editor() {
         this.editingFlags = EnumSet.of(EditingFlag.BEST_QUALITY, EditingFlag.WRITE_HDR_OPTIONS);
-
-        this.workingDirectory = new File("editor_temp");
-        workingDirectory.mkdir();
     }
 
     /**
@@ -76,7 +81,7 @@ public class Editor {
         queue.addAll(timeBetweenBeats);
 
         final VideoEditor editor = new VideoEditor(outputFile, CLIArgs.getInput(), CLIArgs.getAudioInput(), queue, timeStamps);
-        editor.edit(editingFlags);
+        editor.edit(editingFlags, introStart, intoEnd);
     }
 
     /**
