@@ -149,31 +149,38 @@ public class VideoEditor {
 
                 // Only create a new blur transition whenever the sequence has a successor
 
+                /*
                 if (hBlurTransition != null) {
-                    double frames = 0;
 
 
                     // Push frames to the hblur until we have a full second of frames
                     Frame videoFrame;
-                    while ((videoFrame = segmentGrabber.grabImage()) != null && frames <= 120) {
+                    while ((videoFrame = segmentGrabber.grabImage()) != null && segmentGrabber.getTimestamp() < segmentGrabber.getLengthInTime()) {
+                        System.out.println("pushing 01");
                         hBlurTransition.push(1, videoFrame);
-                        frames++;
                     }
 
+                    // Reset the segment grabber
+                    segmentGrabber.restart();
+
+                    System.out.println("pulling some bitches");
                     // Grab from hblur
                     Frame blurFrame;
                     while ((blurFrame = hBlurTransition.pull()) != null) {
+                        System.out.println("recording from hblur");
+
+
                         recorder.record(blurFrame, hBlurTransition.getPixelFormat());
 
                         timePassed += frameTime;
                     }
 
-                    // Reset the segment grabber
-                    segmentGrabber.setTimestamp(0);
 
                     // Reset the transition
                     hBlurTransition.close();
                 }
+
+                 */
 
 
                 // grab the frames & send them to the filters
@@ -185,9 +192,11 @@ public class VideoEditor {
                     timePassed += frameTime;
                 }
 
+                /*
 
-                final long timeStamp = timePassed - 1000L;
-                hBlurTransition = new FFmpegFrameFilter(String.format("[0:v][1:v]xfade=transition=hblur:duration=%s:offset=%sms[v],[v]setpts=N[v]", 1, timeStamp), inputVideo.width(), inputVideo.height());
+                final long length = segmentGrabber.getLengthInTime();
+                final long offset = recorder.getTimestamp() - length;
+                hBlurTransition = new FFmpegFrameFilter(String.format("[0:v][1:v]xfade=transition=hblur:duration=%sus:offset=%sus[v],[v]setpts=N[v]", length, offset), inputVideo.width(), inputVideo.height());
                 hBlurTransition.setFrameRate(inputVideo.frameRate());
                 hBlurTransition.setPixelFormat(segmentGrabber.getPixelFormat());
                 hBlurTransition.setVideoInputs(2);
@@ -195,16 +204,19 @@ public class VideoEditor {
 
                 System.out.println(hBlurTransition.getFilters());
 
-                // Seek 2 seconds back
-                segmentGrabber.setTimestamp(segmentGrabber.getTimestamp() - 2000000L);
+                // Move back 10 frames
+                segmentGrabber.setVideoTimestamp(segmentGrabber.getLengthInTime() - length);
 
                 Frame blurFrame;
 
                 // Push frames to blur filter
                 while ((blurFrame = segmentGrabber.grabImage()) != null) {
+                    System.out.println("Pushing to filter");
                     hBlurTransition.push(0, blurFrame);
                 }
 
+
+                 */
 
                 // Close the grabber, release the resources
                 segmentGrabber.close();
