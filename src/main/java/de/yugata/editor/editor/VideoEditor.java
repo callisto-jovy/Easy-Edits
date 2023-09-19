@@ -90,9 +90,15 @@ public class VideoEditor {
         // Write the segment files that will be stitched together.
         final List<File> segments = this.writeSegments(flags);
 
+        // The videos framerate
+        final double frameRate = inputVideo.frameRate();
+        // The time one frame takes in ms.
+        final double frameTime = 1000 / frameRate;
+
+
         // Recorder for the final product & audio grabber to overlay the audio
         try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath);
-             final FFmpegFrameRecorder recorder = getRecorder(outputFile, flags);) {
+             final FFmpegFrameRecorder recorder = getRecorder(outputFile, flags)) {
 
             // Start grabbing the audio, we need this for the sample rate.
             audioGrabber.start();
@@ -128,12 +134,13 @@ public class VideoEditor {
             final FFmpegFrameFilter[] videoFiltersArray = videoFilters.toArray(new FFmpegFrameFilter[]{});
 
 
-            // This filter is an anomaly. We have to have it here, as we need the offset
-            // Maybe we need to add the offset
+            // The blur transition
             FFmpegFrameFilter hBlurTransition = null;
 
-            for (int i = 0; i < segments.size(); i++) {
-                final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(segments.get(i));
+            long timePassed = 0;
+
+            for (final File segment : segments) {
+                final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(segment);
                 segmentGrabber.setOption("allowed_extensions", "ALL");
                 segmentGrabber.setOption("hwaccel", "cuda");
                 segmentGrabber.setVideoCodecName("h264_cuvid");
@@ -154,11 +161,14 @@ public class VideoEditor {
                     }
 
                     // Grab from hblur
+                    Frame blurFrame;
+                    while ((blurFrame = hBlurTransition.pull()) != null) {
+                        recorder.record(blurFrame, hBlurTransition.getPixelFormat());
 
-                    while ((videoFrame = hBlurTransition.pull()) != null) {
-                        recorder.record(videoFrame, hBlurTransition.getPixelFormat());
+                        timePassed += frameTime;
                     }
 
+                    // Reset the segment grabber
                     segmentGrabber.setTimestamp(0);
 
                     // Reset the transition
@@ -171,22 +181,28 @@ public class VideoEditor {
                 Frame videoFrame;
                 while ((videoFrame = segmentGrabber.grabImage()) != null) {
                     pushToFilters(videoFrame, recorder, videoFiltersArray);
+
+                    timePassed += frameTime;
                 }
 
 
-                hBlurTransition = new FFmpegFrameFilter(String.format("[0:v][1:v]xfade=transition=hblur:duration=%s:offset=%sus[v],[v]setpts=N[v]", 1, recorder.getTimestamp() - 1000000L), inputVideo.width(), inputVideo.height());
+                final long timeStamp = timePassed - 1000L;
+                hBlurTransition = new FFmpegFrameFilter(String.format("[0:v][1:v]xfade=transition=hblur:duration=%s:offset=%sms[v],[v]setpts=N[v]", 1, timeStamp), inputVideo.width(), inputVideo.height());
                 hBlurTransition.setFrameRate(inputVideo.frameRate());
                 hBlurTransition.setPixelFormat(segmentGrabber.getPixelFormat());
                 hBlurTransition.setVideoInputs(2);
                 hBlurTransition.start();
 
+                System.out.println(hBlurTransition.getFilters());
 
-                // Seek 1 second back
+                // Seek 2 seconds back
                 segmentGrabber.setTimestamp(segmentGrabber.getTimestamp() - 2000000L);
 
+                Frame blurFrame;
+
                 // Push frames to blur filter
-                while ((videoFrame = segmentGrabber.grabImage()) != null) {
-                    hBlurTransition.push(0, videoFrame);
+                while ((blurFrame = segmentGrabber.grabImage()) != null) {
+                    hBlurTransition.push(0, blurFrame);
                 }
 
 
