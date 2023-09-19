@@ -9,6 +9,9 @@ import java.util.*;
 
 public class Editor {
 
+    /**
+     * Editor instance, no need to instantiate a new editor class
+     */
     public static final Editor INSTANCE = new Editor();
 
     /**
@@ -26,8 +29,13 @@ public class Editor {
      */
     private final File workingDirectory;
 
+    /**
+     * An Enumset with the {@link EditingFlag} that will be passed to the editor
+     */
     private final EnumSet<EditingFlag> editingFlags;
 
+
+    /* Editor settings */
 
     /**
      * Default constructor, creates a working temp.
@@ -61,9 +69,8 @@ public class Editor {
             throw new IllegalArgumentException("The audio has not been analysed or no beats have been detected, in that case adjust the threshold.");
         }
 
-        //TODO: Output file name
         final File inputFile = new File(CLIArgs.getInput());
-        final File outputFile = new File(workingDirectory, inputFile.getName() + "_edit.mp4");
+        final File outputFile = new File(inputFile.getName() + "_edit.mp4");
 
         final Queue<Double> queue = new ArrayDeque<>();
         queue.addAll(timeBetweenBeats);
@@ -81,6 +88,11 @@ public class Editor {
         return CLIArgs.checkArguments().isEmpty() && !timeBetweenBeats.isEmpty();
     }
 
+    /**
+     * Adds a new timestamp in the next free slot. If that is not possible, the stamp will be appended to the list.
+     *
+     * @param stamp the time stamp to add.
+     */
     public void addTimeStamp(final double stamp) {
         //THIS IS for functionality with the new editor ui. Any open spot created by whatsoever will be filled.
         for (int i = 0; i < timeStamps.size(); i++) {
@@ -93,26 +105,46 @@ public class Editor {
         this.timeStamps.add(stamp);
     }
 
+    /**
+     * Removes a time stamp at a given index.
+     *
+     * @param index the index to set the time stamp to null. This marks the index as overridable.
+     */
     public void removeStampAt(final int index) {
         if (index >= 0 && index <= timeStamps.size()) {
             timeStamps.set(index, null);
         }
     }
 
+    /**
+     * Removes the last timestamp (size -1) with a range check.
+     */
     public void removeLastTimeStamp() {
         if (timeStamps.size() - 1 >= 0) {
             this.timeStamps.remove(timeStamps.size() - 1);
         }
     }
 
+    /**
+     * @return the size of the beats list size.
+     */
     public int beats() {
         return timeBetweenBeats.size();
     }
 
+    /**
+     * @return the size of the time stamp list.
+     */
     public int stamps() {
         return timeStamps.size();
     }
 
+    /**
+     * gets the timestamp at a given index with a range check.
+     *
+     * @param index the index to get.
+     * @return the timestamp at i.
+     */
     public double timeStampAt(final int index) {
         if (index > timeStamps.size() || index < 0) {
             return -1;
@@ -120,6 +152,11 @@ public class Editor {
         return timeStamps.get(index);
     }
 
+    /**
+     * Adds an editing flags or removes it if the flag has already been set
+     *
+     * @param editingFlag the flag to set / unset
+     */
     public void addOrRemoveFlag(final EditingFlag editingFlag) {
         if (editingFlags.contains(editingFlag)) {
             editingFlags.remove(editingFlag);
