@@ -37,10 +37,8 @@ public class VideoPlayer {
             public void windowClosing(WindowEvent e) {
                 super.windowClosing(e);
 
-                if (checkVideoThread()) {
-                    synchronized (videoThread) {
-                        videoThread.interrupt();
-                    }
+                synchronized (videoThread) {
+                    videoThread.interrupt();
                 }
 
                 synchronized (keyboardThread) {
