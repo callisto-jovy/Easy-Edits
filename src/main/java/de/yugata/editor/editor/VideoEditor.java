@@ -111,7 +111,7 @@ public class VideoEditor {
             if (flags.contains(EditingFlag.INTERPOLATE_FRAMES)) {
                 final String videoFilter = String.format("minterpolate=fps=%d,tblend=all_mode=average", EditingFlag.INTERPOLATE_FRAMES.getSetting());
 
-                final FFmpegFrameFilter interpolateFilter = createVideoFilter(videoFilter, 0);
+                final FFmpegFrameFilter interpolateFilter = createVideoFilter(videoFilter, recorder.getPixelFormat());
                 interpolateFilter.start();
                 videoFilters.add(interpolateFilter);
             }
@@ -119,7 +119,7 @@ public class VideoEditor {
             if (flags.contains(EditingFlag.FADE_OUT_VIDEO)) {
                 final int fadeOutLength = EditingFlag.FADE_OUT_VIDEO.getSetting();
                 final int fadeOutStart = (int) ((audioGrabber.getLengthInTime() / 1000000L) - fadeOutLength);
-                final FFmpegFrameFilter videoFadeFilter = createVideoFilter(String.format("fade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength), 0);
+                final FFmpegFrameFilter videoFadeFilter = createVideoFilter(String.format("fade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength), recorder.getPixelFormat());
                 videoFadeFilter.start();
                 videoFilters.add(videoFadeFilter);
             }
@@ -144,6 +144,7 @@ public class VideoEditor {
                 segmentGrabber.setOption("allowed_extensions", "ALL");
                 segmentGrabber.setOption("hwaccel", "cuda");
                 segmentGrabber.setVideoCodecName("h264_cuvid");
+                segmentGrabber.setPixelFormat(recorder.getPixelFormat());
                 segmentGrabber.start();
 
 
@@ -186,7 +187,7 @@ public class VideoEditor {
                 // grab the frames & send them to the filters
 
                 Frame videoFrame;
-                while ((videoFrame = segmentGrabber.grabImage()) != null) {
+                while ((videoFrame = segmentGrabber.grab()) != null) {
                     pushToFilters(videoFrame, recorder, videoFiltersArray);
 
                     timePassed += frameTime;
@@ -380,7 +381,7 @@ public class VideoEditor {
                 Frame processedFrame;
 
                 while ((processedFrame = predecessor.pull()) != null) {
-                    filters[i].push(processedFrame);
+                    filters[i].push(processedFrame, predecessor.getPixelFormat());
                 }
             }
             // Grab the frames from the last filter...
@@ -388,7 +389,7 @@ public class VideoEditor {
             final FFmpegFrameFilter finalFilter = filters[filters.length - 1];
             Frame processedFrame;
             while ((processedFrame = finalFilter.pull()) != null) {
-                recorder.record(processedFrame);
+                recorder.record(processedFrame, finalFilter.getPixelFormat());
             }
         } catch (FFmpegFrameRecorder.Exception | FrameFilter.Exception e) {
             e.printStackTrace();
