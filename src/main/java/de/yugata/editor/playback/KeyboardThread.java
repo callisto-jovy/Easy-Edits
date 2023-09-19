@@ -20,8 +20,8 @@ public class KeyboardThread extends Thread {
 
     @Override
     public void run() {
-        try {
-            while (!interrupted()) {
+        while (!interrupted()) {
+            try {
                 final KeyEvent key = videoPlayer.waitKey();
 
                 switch (key.getKeyCode()) {
@@ -60,9 +60,9 @@ public class KeyboardThread extends Thread {
                         break;
 
                 }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
         }
     }
 }
