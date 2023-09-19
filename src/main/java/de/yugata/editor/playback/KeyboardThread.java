@@ -56,6 +56,10 @@ public class KeyboardThread extends Thread {
                         videoPlayer.stamp();
                         break;
 
+                    case VK_I:
+                        videoPlayer.setIntro();
+                        break;
+
                     case VK_V:
                         videoPlayer.removeStamp();
                         break;
