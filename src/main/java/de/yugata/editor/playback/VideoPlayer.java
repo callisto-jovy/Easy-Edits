@@ -88,7 +88,7 @@ public class VideoPlayer {
     }
 
     public void setIntro() {
-        if (Editor.INSTANCE.getIntroStart() == 0) {
+        if (Editor.INSTANCE.getIntroStart() == -1) {
             Editor.INSTANCE.setIntroStart(videoThread.getCurrentTimeStamp());
         } else {
             Editor.INSTANCE.setIntoEnd(videoThread.getCurrentTimeStamp());
