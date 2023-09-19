@@ -45,9 +45,6 @@ public class VideoThread extends Thread {
      */
     private boolean paused;
 
-    private long startTime = 0;
-
-
     /**
      * Default constructor.
      *
@@ -58,7 +55,7 @@ public class VideoThread extends Thread {
     }
 
     /**
-     * Overwrites the thread's start method, starts the famegrabber to
+     * Overwrites the thread's start method, starts the famegrabber
      */
     @Override
     public void start() {
@@ -73,9 +70,11 @@ public class VideoThread extends Thread {
                 return frame;
             }
         };
+
         frameGrabber.setOption("allowed_extensions", "ALL");
         frameGrabber.setOption("hwaccel", "cuda");
         frameGrabber.setVideoCodecName("hevc_cuvid");
+
         try {
             frameGrabber.start();
         } catch (FFmpegFrameGrabber.Exception e) {
@@ -151,14 +150,5 @@ public class VideoThread extends Thread {
 
     public double getCurrentTimeStamp() {
         return frameGrabber.getTimestamp();
-    }
-
-    public void setTimeStamp(long l) {
-        try {
-            frameGrabber.setTimestamp(l);
-            frameGrabber.resetStartTime();
-        } catch (FFmpegFrameGrabber.Exception ex) {
-            throw new RuntimeException(ex);
-        }
     }
 }

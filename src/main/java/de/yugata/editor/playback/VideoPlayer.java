@@ -51,10 +51,6 @@ public class VideoPlayer {
 
     }
 
-    public boolean isRunning() {
-        return videoCanvas.isShowing() && keyboardThread.isAlive() && videoThread.isAlive();
-    }
-
     private boolean checkVideoThread() {
         return videoThread.isAlive() && !videoThread.isInterrupted();
     }
@@ -63,14 +59,12 @@ public class VideoPlayer {
     public void stamp() {
         if (checkVideoThread())
             Editor.INSTANCE.addTimeStamp(videoThread.getCurrentTimeStamp());
-
     }
 
     public void removeStamp() {
         if (checkVideoThread())
             Editor.INSTANCE.removeLastTimeStamp();
     }
-
 
     public void pause() {
         if (checkVideoThread())
@@ -81,11 +75,6 @@ public class VideoPlayer {
         if (checkVideoThread())
 
             videoThread.seek(l);
-    }
-
-    public void setTimeStamp(long l) {
-        if (checkVideoThread())
-            videoThread.setTimeStamp(l);
     }
 
     public void stop() {
