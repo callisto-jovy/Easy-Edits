@@ -148,7 +148,7 @@ public class VideoThread extends Thread {
         }
     }
 
-    public double getCurrentTimeStamp() {
+    public long getCurrentTimeStamp() {
         return frameGrabber.getTimestamp();
     }
 }

@@ -12,7 +12,7 @@ import java.util.*;
 public class VideoEditor {
 
     private final Queue<Double> timeBetweenBeats;
-    private final List<Double> videoTimeStamps;
+    private final List<Long> videoTimeStamps;
 
 
     /**
@@ -38,7 +38,7 @@ public class VideoEditor {
 
     private final File outputFile;
 
-    public VideoEditor(final File outputFile, final String videoInput, final String audioInput, final Queue<Double> timeBetweenBeats, final List<Double> videoTimeStamps) {
+    public VideoEditor(final File outputFile, final String videoInput, final String audioInput, final Queue<Double> timeBetweenBeats, final List<Long> videoTimeStamps) {
         this.videoPath = videoInput;
         this.audioPath = audioInput;
         this.timeBetweenBeats = timeBetweenBeats;
@@ -86,7 +86,7 @@ public class VideoEditor {
         }
     }
 
-    public void edit(final EnumSet<EditingFlag> flags, final int introStart, final int introEnd) {
+    public void edit(final EnumSet<EditingFlag> flags, final long introStart, final long introEnd) {
         // Write the segment files that will be stitched together.
         final List<File> segments = this.writeSegments(flags);
 
@@ -102,6 +102,20 @@ public class VideoEditor {
 
             // Start grabbing the audio, we need this for the sample rate.
             audioGrabber.start();
+
+            // Add the intro in front
+
+            this.initFrameGrabber();
+            this.frameGrabber.setTimestamp(introStart);
+            recorder.setTimestamp(0);
+
+            Frame introFrame;
+            while ((introFrame = frameGrabber.grab()) != null && (frameGrabber.getTimestamp() < introEnd)) {
+                recorder.record(introFrame);
+            }
+
+            this.releaseFrameGrabber();
+
 
 
             /* Configuring the video filters */
@@ -137,7 +151,7 @@ public class VideoEditor {
             // The blur transition
             FFmpegFrameFilter hBlurTransition = null;
 
-            long timePassed = 0;
+            //100ms
 
             for (final File segment : segments) {
                 final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(segment);
@@ -147,92 +161,22 @@ public class VideoEditor {
                 segmentGrabber.setPixelFormat(recorder.getPixelFormat());
                 segmentGrabber.start();
 
-
-                // Only create a new blur transition whenever the sequence has a successor
-
-                /*
-                if (hBlurTransition != null) {
-
-
-                    // Push frames to the hblur until we have a full second of frames
-                    Frame videoFrame;
-                    while ((videoFrame = segmentGrabber.grabImage()) != null && segmentGrabber.getTimestamp() < segmentGrabber.getLengthInTime()) {
-                        System.out.println("pushing 01");
-                        hBlurTransition.push(1, videoFrame);
-                    }
-
-                    // Reset the segment grabber
-                    segmentGrabber.restart();
-
-                    System.out.println("pulling some bitches");
-                    // Grab from hblur
-                    Frame blurFrame;
-                    while ((blurFrame = hBlurTransition.pull()) != null) {
-                        System.out.println("recording from hblur");
-
-
-                        recorder.record(blurFrame, hBlurTransition.getPixelFormat());
-
-                        timePassed += frameTime;
-                    }
-
-
-                    // Reset the transition
-                    hBlurTransition.close();
-                }
-
-                 */
-
-
                 // grab the frames & send them to the filters
 
                 Frame videoFrame;
                 while ((videoFrame = segmentGrabber.grab()) != null) {
                     pushToFilters(videoFrame, recorder, videoFiltersArray);
-
-                    timePassed += frameTime;
                 }
 
-                /*
-
-                final long length = segmentGrabber.getLengthInTime();
-                final long offset = recorder.getTimestamp() - length;
-                hBlurTransition = new FFmpegFrameFilter(String.format("[0:v][1:v]xfade=transition=hblur:duration=%sus:offset=%sus[v],[v]setpts=N[v]", length, offset), inputVideo.width(), inputVideo.height());
-                hBlurTransition.setFrameRate(inputVideo.frameRate());
-                hBlurTransition.setPixelFormat(segmentGrabber.getPixelFormat());
-                hBlurTransition.setVideoInputs(2);
-                hBlurTransition.start();
-
-                System.out.println(hBlurTransition.getFilters());
-
-                // Move back 10 frames
-                segmentGrabber.setVideoTimestamp(segmentGrabber.getLengthInTime() - length);
-
-                Frame blurFrame;
-
-                // Push frames to blur filter
-                while ((blurFrame = segmentGrabber.grabImage()) != null) {
-                    System.out.println("Pushing to filter");
-                    hBlurTransition.push(0, blurFrame);
-                }
-
-
-                 */
-
-                // Close the grabber, release the resources
-                segmentGrabber.close();
             }
 
 
             // Overlay the audio
             Frame audioFrame;
             while ((audioFrame = audioGrabber.grab()) != null) {
-                recorder.setTimestamp(audioFrame.timestamp);
+                recorder.setTimestamp(introStart + audioFrame.timestamp);
                 recorder.record(audioFrame);
             }
-
-            //TODO: add the intro
-
 
             /* Clean up resources */
 
@@ -266,7 +210,7 @@ public class VideoEditor {
 
             /* Beat loop */
             while (timeBetweenBeats.peek() != null) {
-                final double timeBetween = timeBetweenBeats.poll();
+                double timeBetween = timeBetweenBeats.poll();
 
                 // If the next stamp (index in the list) is valid, we move to the timestamp.
                 // If not, we just keep recording, until no beat times are left
@@ -278,7 +222,7 @@ public class VideoEditor {
                 }
 
                 // Write a new segment to disk
-                final File segmentFile = File.createTempFile(String.format("segment %d", nextStamp), ".mp4", Editor.WORKING_DIRECTORY);
+                final File segmentFile = new File(Editor.WORKING_DIRECTORY, String.format("segment %d.mp4", nextStamp));
                 segmentFiles.add(segmentFile); // Add the file to the segments.
                 final FFmpegFrameRecorder recorder = getRecorder(segmentFile, flags);
 

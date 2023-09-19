@@ -22,7 +22,7 @@ public class Editor {
     /**
      * A List with all the user's time stamps.
      */
-    private final List<Double> timeStamps = new ArrayList<>();
+    private final List<Long> timeStamps = new ArrayList<>();
 
     /**
      * The application's working directory.
@@ -42,7 +42,7 @@ public class Editor {
     /* Editor settings */
 
     //TODO: move to editing flags
-    private int introStart = -1, intoEnd = -1;
+    private long introStart = -1, intoEnd = -1;
 
 
     /**
@@ -98,7 +98,7 @@ public class Editor {
      *
      * @param stamp the time stamp to add.
      */
-    public void addTimeStamp(final double stamp) {
+    public void addTimeStamp(final long stamp) {
         //THIS IS for functionality with the new editor ui. Any open spot created by whatsoever will be filled.
         for (int i = 0; i < timeStamps.size(); i++) {
             if (timeStamps.get(i) == null) {
@@ -168,6 +168,23 @@ public class Editor {
         } else {
             editingFlags.add(editingFlag);
         }
+    }
+
+
+    public double getIntroStart() {
+        return introStart;
+    }
+
+    public void setIntroStart(long introStart) {
+        this.introStart = introStart;
+    }
+
+    public double getIntoEnd() {
+        return intoEnd;
+    }
+
+    public void setIntoEnd(long intoEnd) {
+        this.intoEnd = intoEnd;
     }
 
     public EnumSet<EditingFlag> getEditingFlags() {
