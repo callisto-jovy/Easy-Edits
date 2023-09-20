@@ -6,6 +6,10 @@ public enum EditingFlag {
     BEST_QUALITY("Will use the best quality preset by FFMPEG, i.e. cf=0", 0),
     SHUFFLE_SEQUENCES("Shuffles the video timestamps, which may lead to more variety in the end product. If you selected your scenes with care and they follow a particular order, this should be disabled.", -1), //TODO: implement
     INTERPOLATE_FRAMES("Will interpolate and blend between the frames, giving the illusion of motion blur. This is not GPU-accelerated and might take a long time.", 120),
+    FADE_TRANSITION("Will fade in from black for a certain amount of milliseconds", 200),
+
+    ZOOM_IN("WIP", 200),
+
     FADE_OUT_VIDEO("Will add a fade to black at the end of the edit.", 4);
 
 

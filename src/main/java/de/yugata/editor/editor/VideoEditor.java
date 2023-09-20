@@ -90,6 +90,14 @@ public class VideoEditor {
         // Write the segment files that will be stitched together.
         final List<File> segments = this.writeSegments(flags);
 
+        /*
+        final List<File> segments = Arrays.stream(Editor.WORKING_DIRECTORY.listFiles()).sorted(Comparator.comparingInt(value -> Integer.parseInt(value.getName().substring("segment ".length(), value.getName().lastIndexOf("."))))).collect(Collectors.toList());
+
+        this.initFrameGrabber();
+        this.releaseFrameGrabber();
+
+         */
+
         // Recorder for the final product & audio grabber to overlay the audio
         try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath);
              final FFmpegFrameRecorder recorder = getRecorder(outputFile, flags)) {
@@ -99,16 +107,17 @@ public class VideoEditor {
 
             // Add the intro in front
 
-            this.initFrameGrabber();
-            this.frameGrabber.setTimestamp(introStart);
+            if (introStart != -1 && introEnd != -1) {
+                this.initFrameGrabber();
+                this.frameGrabber.setTimestamp(introStart);
 
-            Frame introFrame;
-            while ((introFrame = frameGrabber.grab()) != null && frameGrabber.getTimestamp() < introEnd) {
-                recorder.record(introFrame);
+                Frame introFrame;
+                while ((introFrame = frameGrabber.grab()) != null && frameGrabber.getTimestamp() < introEnd) {
+                    recorder.record(introFrame);
+                }
+
+                this.releaseFrameGrabber();
             }
-
-            this.releaseFrameGrabber();
-
 
 
             /* Configuring the video filters */
@@ -131,14 +140,27 @@ public class VideoEditor {
                 videoFilters.add(videoFadeFilter);
             }
 
-            //TODO: Not available in our javacv build
-            //final FFmpegFrameFilter colorCorrection = createVideoFilter("setpts=N,eq=brightness=0.1:saturation=3:gamma=1, curves=m='0/0,0.5/0.8,1/1'");
-            //final FFmpegFrameFilter toneMapping = createVideoFilter("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p");
+            if (flags.contains(EditingFlag.ZOOM_IN)) {
+
+                final FFmpegFrameFilter zoomAnimation = createVideoFilter("zoompan=z='min(pzoom+0.00213,2.13)':x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2):d=1:fps=60", recorder.getPixelFormat());
+                zoomAnimation.start();
+                videoFilters.add(zoomAnimation);
+            }
+
+            //    final FFmpegFrameFilter sharpen = createVideoFilter("smartblur=1.5:-0.35:-3.5:0.65:0.25:2.0", recorder.getPixelFormat());
+            //   sharpen.start();
+            // videoFilters.add(sharpen);
 
 
             // Array with all our video filters. This is needed for the pushToFilters method. Otherwise, the filters would be a new array every time.
             // This is just how java works.
-            final FFmpegFrameFilter[] videoFiltersArray = videoFilters.toArray(new FFmpegFrameFilter[]{});
+            //   final FFmpegFrameFilter[] videoFiltersArray = videoFilters.toArray(new FFmpegFrameFilter[]{});
+
+
+            //TODO: Not available in our javacv build
+            //final FFmpegFrameFilter colorCorrection = createVideoFilter("setpts=N,eq=brightness=0.1:saturation=3:gamma=1, curves=m='0/0,0.5/0.8,1/1'");
+            //final FFmpegFrameFilter toneMapping = createVideoFilter("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p");
+
 
             for (final File segment : segments) {
                 final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(segment);
@@ -148,20 +170,34 @@ public class VideoEditor {
                 segmentGrabber.setPixelFormat(recorder.getPixelFormat());
                 segmentGrabber.start();
 
-                // grab the frames & send them to the filters
+                if (flags.contains(EditingFlag.FADE_TRANSITION)) {
+                    final FFmpegFrameFilter fadeIn = createVideoFilter(String.format("fade=t=in:st=%dus:d=%dms", 0, EditingFlag.FADE_TRANSITION.getSetting()), recorder.getPixelFormat());
+                    fadeIn.start();
+                    videoFilters.add(fadeIn);
+                }
 
+                final FFmpegFrameFilter[] videoFiltersArray = videoFilters.toArray(new FFmpegFrameFilter[]{});
+
+                // grab the frames & send them to the filters
                 Frame videoFrame;
                 while ((videoFrame = segmentGrabber.grab()) != null) {
                     pushToFilters(videoFrame, recorder, videoFiltersArray);
                 }
 
+                if (flags.contains(EditingFlag.FADE_TRANSITION)) {
+                    videoFilters.get(videoFilters.size() - 1).close();
+                    videoFilters.remove(videoFilters.size() - 1);
+                }
+
+                // Close the grabber, release the resources
+                segmentGrabber.close();
             }
 
 
             // Overlay the audio
             Frame audioFrame;
             while ((audioFrame = audioGrabber.grab()) != null) {
-                recorder.setTimestamp(introStart + audioFrame.timestamp);
+                recorder.setTimestamp(introStart == -1 ? audioFrame.timestamp : introStart + audioFrame.timestamp);
                 recorder.record(audioFrame);
             }
 
@@ -258,7 +294,9 @@ public class VideoEditor {
 
         if (flags.contains(EditingFlag.BEST_QUALITY)) {
             recorder.setVideoQuality(EditingFlag.BEST_QUALITY.getSetting()); // best quality --> Produces big files
-            recorder.setOption("cq", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
+            recorder.setVideoOption("cq", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
+            recorder.setVideoOption("preset", "slow");
+            recorder.setVideoOption("crf", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
         }
 
 
@@ -266,9 +304,11 @@ public class VideoEditor {
         recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
         recorder.setFrameRate(inputVideo.frameRate());
         recorder.setSampleRate(inputVideo.sampleRate());
-        // Select the "highest" bitrate. If the video has a lower bitrate than HD, we just set it to hd.
+        // Select the "highest" bitrate.
         final int bitrate = 120 * inputVideo.width() * inputVideo.height();
-        recorder.setVideoBitrate(Math.max(bitrate, inputVideo.bitrate())); // max bitrate
+        System.out.println(bitrate);
+        System.out.println(inputVideo.bitrate());
+        recorder.setVideoBitrate(120 * 1024 * 1024); // max bitrate
         recorder.setVideoCodecName("h264_nvenc"); // Hardware-accelerated encoding.
 
         recorder.start();
