@@ -125,7 +125,10 @@ public class VideoEditor {
             final List<FFmpegFrameFilter> videoFilters = new ArrayList<>();
 
             if (flags.contains(EditingFlag.INTERPOLATE_FRAMES)) {
-                final String videoFilter = String.format("minterpolate=fps=%d,tblend=all_mode=average", EditingFlag.INTERPOLATE_FRAMES.getSetting());
+                final int fps = EditingFlag.INTERPOLATE_FRAMES.getSetting();
+                final int factor = (int) (fps / recorder.getFrameRate());
+
+                final String videoFilter = String.format("minterpolate=fps=%d,tblend=all_mode=average,setpts=%d*PTS", fps, factor);
 
                 final FFmpegFrameFilter interpolateFilter = createVideoFilter(videoFilter, recorder.getPixelFormat());
                 interpolateFilter.start();

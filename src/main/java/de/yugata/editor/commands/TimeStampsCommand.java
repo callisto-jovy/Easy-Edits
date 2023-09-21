@@ -1,6 +1,8 @@
 package de.yugata.editor.commands;
 
 
+import de.yugata.editor.editor.Editor;
+import de.yugata.editor.playback.VideoPlayer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.shell.command.CommandRegistration;
 import org.springframework.shell.standard.ShellComponent;
@@ -15,31 +17,77 @@ public class TimeStampsCommand {
     public CommandRegistration timeStamps() {
         return CommandRegistration
                 .builder()
-                .command("set", "intro")
+                .command("stamp")
                 .withOption()
-                .longNames("from")
+                .longNames("remove")
                 .type(Integer.class)
-                .description("The start of the intro. If not specified, this will be 0.")
+                .description("Remove a certain timestamp")
                 .and()
                 .withOption()
-                .longNames("to")
+                .longNames("all")
+                .description("Prints all the timestamps.")
+                .and()
+                .withOption()
+                .longNames("length")
+                .description("Prints the length of all the list.")
+                .and()
+                .withOption()
+                .longNames("override")
+                .description("Override the next missing timestamp.")
+                .and()
+                .withOption()
+                .longNames("visit")
+                .description("Visit any timestamps starting position at its index")
                 .type(Integer.class)
-                .description("The end of the intro. If not specified, this will be 0.")
-                .required()
                 .and()
                 .group("Workflow")
                 .description(DESCRIPTION)
                 .withTarget()
                 .function(ctx -> {
-                    final int from = ctx.hasMappedOption("from") ? ctx.getOptionValue("from") : 0;
-                    final int to = ctx.getOptionValue("to");
+                    if (ctx.hasMappedOption("length")) {
+                        return "Total amount of stamps: " + Editor.INSTANCE.stamps();
 
+                    } else if (ctx.hasMappedOption("all")) {
+                        return getTimeStamps();
 
+                    } else if (ctx.hasMappedOption("remove")) {
+                        final int index = ctx.getOptionValue("remove");
+                        Editor.INSTANCE.removeStampAt(index);
+                        return String.format("Removed stamp at %d. If nothing happened, the index was out of bounds", index);
 
-                    return String.format("The intro has been set to %d to %d", from, to);
+                    } else if (ctx.hasMappedOption("override")) {
+                        VideoPlayer.INSTANCE.start();
+                        return "Starting player. The next placed stamp will override the first removed stamp in the list.";
+
+                    } else if (ctx.hasMappedOption("visit")) {
+                        final int index = ctx.getOptionValue("visit");
+                        final Long stamp = Editor.INSTANCE.timeStampAt(index);
+                        if (stamp == null) {
+                            return "This stamp currently is marked as null or is out of bounds.";
+                        }
+
+                        VideoPlayer.INSTANCE.seek(Editor.INSTANCE.timeStampAt(index));
+                        return "Seeking to stamp";
+                    }
+                    return "Unknown option.";
                 })
                 .and()
                 .build();
+    }
+
+
+    private String getTimeStamps() {
+        final StringBuilder builder = new StringBuilder();
+
+        for (int i = 0; i < Editor.INSTANCE.stamps(); i++) {
+            builder.append(i)
+                    .append(":")
+                    .append(Editor.INSTANCE.timeStampAt(i))
+                    .append("\n");
+
+        }
+
+        return builder.toString();
     }
 
 
