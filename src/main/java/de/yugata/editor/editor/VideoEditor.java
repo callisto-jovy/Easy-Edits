@@ -194,11 +194,20 @@ public class VideoEditor {
             }
 
 
+            final List<FFmpegFrameFilter> audioFilters = new ArrayList<>();
+
+            if (flags.contains(EditingFlag.FADE_OUT_VIDEO)) {
+                final int fadeOutLength = EditingFlag.FADE_OUT_VIDEO.getSetting();
+                final int fadeOutStart = (int) ((audioGrabber.getLengthInTime() / 1000000L) - fadeOutLength);
+                final FFmpegFrameFilter audioFadeFilter = createAudioFilter(String.format("fade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength));
+                audioFilters.add(audioFadeFilter);
+            }
+
             // Overlay the audio
             Frame audioFrame;
             while ((audioFrame = audioGrabber.grab()) != null) {
                 recorder.setTimestamp(introStart == -1 ? audioFrame.timestamp : introStart + audioFrame.timestamp);
-                recorder.record(audioFrame);
+                pushToFilters(audioFrame, recorder, audioFilters.toArray(new FFmpegFrameFilter[]{}));
             }
 
             /* Clean up resources */
@@ -305,9 +314,6 @@ public class VideoEditor {
         recorder.setFrameRate(inputVideo.frameRate());
         recorder.setSampleRate(inputVideo.sampleRate());
         // Select the "highest" bitrate.
-        final int bitrate = 120 * inputVideo.width() * inputVideo.height();
-        System.out.println(bitrate);
-        System.out.println(inputVideo.bitrate());
         recorder.setVideoBitrate(120 * 1024 * 1024); // max bitrate
         recorder.setVideoCodecName("h264_nvenc"); // Hardware-accelerated encoding.
 
