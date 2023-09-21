@@ -8,9 +8,7 @@ public class CLIArgs {
 
 
     private static String input;
-
     private static String audioInput;
-
     private static double peakThreshold;
     private static double msThreshold;
 
