@@ -1,11 +1,16 @@
 package de.yugata.editor.editor;
 
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import de.yugata.editor.audio.AudioAnalyser;
 import de.yugata.editor.model.CLIArgs;
 
 import java.io.File;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
 
 public class Editor {
 
@@ -77,10 +82,8 @@ public class Editor {
         final File inputFile = new File(CLIArgs.getInput());
         final File outputFile = new File(inputFile.getName() + "_edit.mp4");
 
-        final Queue<Double> queue = new ArrayDeque<>();
-        queue.addAll(timeBetweenBeats);
 
-        final VideoEditor editor = new VideoEditor(outputFile, CLIArgs.getInput(), CLIArgs.getAudioInput(), queue, timeStamps);
+        final VideoEditor editor = new VideoEditor(outputFile, CLIArgs.getInput(), CLIArgs.getAudioInput(), new ArrayDeque<>(timeBetweenBeats), new ArrayList<>(timeStamps));
         editor.edit(editingFlags, introStart, intoEnd);
     }
 
@@ -150,9 +153,9 @@ public class Editor {
      * @param index the index to get.
      * @return the timestamp at i.
      */
-    public double timeStampAt(final int index) {
+    public Long timeStampAt(final int index) {
         if (index > timeStamps.size() || index < 0) {
-            return -1;
+            return null;
         }
         return timeStamps.get(index);
     }
@@ -168,6 +171,36 @@ public class Editor {
         } else {
             editingFlags.add(editingFlag);
         }
+    }
+
+    public JsonObject toJson() {
+        final JsonObject root = new JsonObject();
+        final JsonArray jsonStamps = new JsonArray();
+        final JsonArray jsonBeats = new JsonArray();
+
+        timeBetweenBeats.forEach(aDouble -> jsonBeats.add(aDouble));
+        timeStamps.forEach(aLong -> jsonStamps.add(aLong));
+
+        root.addProperty("intro_start", introStart);
+        root.addProperty("intro_end", intoEnd);
+
+        root.add("time_stamps", jsonStamps);
+        root.add("beat_times", jsonBeats);
+
+
+        return root;
+    }
+
+    public void fromJson(final JsonObject root) {
+        final JsonArray jsonStamps = root.getAsJsonArray("time_stamps");
+        final JsonArray jsonBeats = root.getAsJsonArray("beat_times");
+
+        jsonStamps.forEach(jsonElement -> timeStamps.add(jsonElement.getAsLong()));
+        jsonBeats.forEach(jsonElement -> timeBetweenBeats.add(jsonElement.getAsDouble()));
+
+        setIntoEnd(root.get("intro_end").getAsLong());
+        setIntroStart(root.get("intro_start").getAsLong());
+
     }
 
 
