@@ -200,15 +200,13 @@ public class VideoEditor {
 
             final List<FFmpegFrameFilter> audioFilters = new ArrayList<>();
 
-            /*
+
             if (flags.contains(EditingFlag.FADE_OUT_VIDEO)) {
                 final int fadeOutLength = EditingFlag.FADE_OUT_VIDEO.getSetting();
                 final int fadeOutStart = (int) ((audioGrabber.getLengthInTime() / 1000000L) - fadeOutLength);
-                final FFmpegFrameFilter audioFadeFilter = createAudioFilter(String.format("fade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength));
+                final FFmpegFrameFilter audioFadeFilter = createAudioFilter(String.format("afade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength));
                 audioFilters.add(audioFadeFilter);
             }
-
-             */
 
             // Overlay the audio
             Frame audioFrame;
