@@ -9,6 +9,7 @@ import org.springframework.shell.Availability;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
 import org.springframework.shell.standard.ShellMethodAvailability;
+import org.springframework.shell.standard.ShellOption;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,9 +23,9 @@ public class EditorStateCommand {
     private static final File SAVE_FILE = new File(Editor.WORKING_DIRECTORY, "saved_state.json");
 
 
-    @ShellMethod(value = "Exports all the settings to load again.", group = "Workflow")
+    @ShellMethod(key = {"export"}, value = "Exports all the settings to load again.", group = "Workflow")
     @ShellMethodAvailability("exportAvailability")
-    public void exportSequences() {
+    public void exportSequences(@ShellOption(value = {"file"}) String filePath) {
 
         final JsonObject root = new JsonObject();
         // Add input / audio
@@ -35,17 +36,19 @@ public class EditorStateCommand {
         // Add editor object
         root.add("editor_state", Editor.INSTANCE.toJson());
 
+
+        final File fileOutput = filePath == null ? SAVE_FILE : new File(filePath).canWrite() ? new File(filePath) : SAVE_FILE;
         try {
-            FileUtils.write(SAVE_FILE, GSON.toJson(root), StandardCharsets.UTF_8);
+            FileUtils.write(fileOutput, GSON.toJson(root), StandardCharsets.UTF_8);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    @ShellMethod(value = "Imports all the settings to load again.", group = "Workflow")
-    public void importSequences() {
+    @ShellMethod(key = {"import"}, value = "Imports all the settings to load again.", group = "Workflow")
+    public void importSequences(@ShellOption(value = {"file"}) String filePath) {
         try {
-            final String json = FileUtils.readFileToString(SAVE_FILE, StandardCharsets.UTF_8);
+            final String json = FileUtils.readFileToString(filePath == null ? SAVE_FILE : new File(filePath), StandardCharsets.UTF_8);
             final JsonObject root = JsonParser.parseString(json).getAsJsonObject();
 
             CLIArgs.setInput(root.get("source_video").getAsString());
