@@ -15,7 +15,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Queue;
-import java.util.logging.Logger;
 
 public class AudioAnalyser {
 
@@ -23,19 +22,17 @@ public class AudioAnalyser {
         final Queue<Double> timeBetweenBeats = new ArrayDeque<>();
 
         final double[] lastMs = {0};
-        analyseBeats(audioInput, peakThreshold, (timeStamp, salience) -> {
+        analyseBeats(audioInput, peakThreshold, msThreshold, (timeStamp, salience) -> {
             final double time = (timeStamp * 1000);
             final double msPassed = time - lastMs[0];
 
-            if (msPassed >= msThreshold) {
-                timeBetweenBeats.add(msPassed);
-                lastMs[0] = time;
-            }
+            timeBetweenBeats.add(msPassed);
+            lastMs[0] = time;
         });
         return timeBetweenBeats;
     }
 
-    public static void analyseBeats(final String audioInput, final double peakThreshold, final OnsetHandler tracker) {
+    public static void analyseBeats(final String audioInput, final double peakThreshold, final double msThreshold, final OnsetHandler tracker) {
         validatePath(audioInput);
 
 
@@ -60,7 +57,7 @@ public class AudioAnalyser {
 
 
             //TODO: Setting
-            final ComplexOnsetDetector detector = new ComplexOnsetDetector(bufferSize, peakThreshold);
+            final ComplexOnsetDetector detector = new ComplexOnsetDetector(bufferSize, peakThreshold, msThreshold / 1000);
             final BeatRootOnsetEventHandler handler = new BeatRootOnsetEventHandler();
             detector.setHandler(handler);
             dispatcher.addAudioProcessor(detector);
