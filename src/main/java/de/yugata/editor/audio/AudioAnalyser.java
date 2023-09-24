@@ -2,6 +2,7 @@ package de.yugata.editor.audio;
 
 
 import be.tarsos.dsp.AudioDispatcher;
+import be.tarsos.dsp.beatroot.BeatRootOnsetEventHandler;
 import be.tarsos.dsp.io.jvm.JVMAudioInputStream;
 import be.tarsos.dsp.onsets.ComplexOnsetDetector;
 import be.tarsos.dsp.onsets.OnsetHandler;
@@ -14,6 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Queue;
+import java.util.logging.Logger;
 
 public class AudioAnalyser {
 
@@ -22,11 +24,12 @@ public class AudioAnalyser {
 
         final double[] lastMs = {0};
         analyseBeats(audioInput, peakThreshold, (timeStamp, salience) -> {
-            final double msPassed = timeStamp - lastMs[0];
+            final double time = (timeStamp * 1000);
+            final double msPassed = time - lastMs[0];
 
             if (msPassed >= msThreshold) {
                 timeBetweenBeats.add(msPassed);
-                lastMs[0] = timeStamp;
+                lastMs[0] = time;
             }
         });
         return timeBetweenBeats;
