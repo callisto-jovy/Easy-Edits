@@ -19,7 +19,6 @@ public class AudioAnalyserUI extends JFrame {
     private double msThreshold;
     private double threshold;
 
-
     private final WaveForm waveForm;
 
 

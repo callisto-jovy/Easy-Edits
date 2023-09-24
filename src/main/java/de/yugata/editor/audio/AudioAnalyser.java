@@ -2,7 +2,6 @@ package de.yugata.editor.audio;
 
 
 import be.tarsos.dsp.AudioDispatcher;
-import be.tarsos.dsp.beatroot.BeatRootOnsetEventHandler;
 import be.tarsos.dsp.io.jvm.JVMAudioInputStream;
 import be.tarsos.dsp.onsets.ComplexOnsetDetector;
 import be.tarsos.dsp.onsets.OnsetHandler;
@@ -15,7 +14,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Queue;
-import java.util.logging.Logger;
 
 public class AudioAnalyser {
 
@@ -24,12 +22,11 @@ public class AudioAnalyser {
 
         final double[] lastMs = {0};
         analyseBeats(audioInput, peakThreshold, (timeStamp, salience) -> {
-            final double time = (timeStamp * 1000);
-            final double msPassed = time - lastMs[0];
+            final double msPassed = timeStamp - lastMs[0];
 
             if (msPassed >= msThreshold) {
                 timeBetweenBeats.add(msPassed);
-                lastMs[0] = time;
+                lastMs[0] = timeStamp;
             }
         });
         return timeBetweenBeats;
@@ -46,8 +43,8 @@ public class AudioAnalyser {
 
             // Sample rate, the buffer's size and overlap between buffers
             final float sampleRate = audioFormat.getSampleRate(); //We get the sample rate from the file
-            final int bufferSize = 512, // Just hardcoded
-                    bufferOverlap = 256; // We don't need any overlap.
+            final int bufferSize = 2048, // Just hardcoded
+                    bufferOverlap = 1024;
 
             // Don't continue from here, just abort.
             if (sampleRate == -1)
