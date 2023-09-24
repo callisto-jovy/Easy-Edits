@@ -169,6 +169,7 @@ public class VideoEditor {
                 final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(segment);
                 segmentGrabber.setOption("allowed_extensions", "ALL");
                 segmentGrabber.setOption("hwaccel", "cuda");
+                segmentGrabber.setVideoBitrate(0);
                 segmentGrabber.setVideoCodecName("h264_cuvid");
                 segmentGrabber.setPixelFormat(recorder.getPixelFormat());
                 segmentGrabber.start();
@@ -293,6 +294,7 @@ public class VideoEditor {
         final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(outputFile, inputVideo.width(), inputVideo.height(), 2);
 
         recorder.setFormat("mp4");
+        recorder.setVideoCodecName("h264_nvenc"); // Hardware-accelerated encoding.
 
         // Preserve the color range for the HDR video files.
         // This lets us tone-map the hdr content later on if we want to.
@@ -307,8 +309,11 @@ public class VideoEditor {
         if (flags.contains(EditingFlag.BEST_QUALITY)) {
             recorder.setVideoQuality(EditingFlag.BEST_QUALITY.getSetting()); // best quality --> Produces big files
             recorder.setVideoOption("cq", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
-            recorder.setVideoOption("preset", "slow");
+            recorder.setOption("preset", "slow");
             recorder.setVideoOption("crf", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
+            recorder.setVideoOption("qmin", "0");
+            recorder.setVideoOption("qmax", "24");
+            //  recorder.setOption("b:v", "0");
         }
 
 
@@ -317,8 +322,7 @@ public class VideoEditor {
         recorder.setFrameRate(inputVideo.frameRate());
         recorder.setSampleRate(inputVideo.sampleRate());
         // Select the "highest" bitrate.
-        recorder.setVideoBitrate(120 * 1024 * 1024); // max bitrate
-        recorder.setVideoCodecName("h264_nvenc"); // Hardware-accelerated encoding.
+        recorder.setVideoBitrate(0); // max bitrate
 
         recorder.start();
 
