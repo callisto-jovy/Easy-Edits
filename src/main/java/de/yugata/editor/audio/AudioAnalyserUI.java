@@ -131,15 +131,10 @@ public class AudioAnalyserUI extends JFrame {
 
         final double[] lastMs = {0};
 
-        AudioAnalyser.analyseBeats(audioFile.getAbsolutePath(), threshold / 100, (timeStamp, salience) -> {
+        AudioAnalyser.analyseBeats(audioFile.getAbsolutePath(), threshold / 100, msThreshold, (timeStamp, salience) -> {
             final double time = (timeStamp * 1000);
-            final double msPassed = time - lastMs[0];
-
-            if (msPassed >= msThreshold) {
-                waveForm.addIndicator(timeStamp);
-                lastMs[0] = time;
-
-            }
+            waveForm.addIndicator(timeStamp);
+            lastMs[0] = time;
         });
 
         waveForm.repaint();

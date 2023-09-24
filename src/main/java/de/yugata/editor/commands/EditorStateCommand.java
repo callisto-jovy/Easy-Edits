@@ -25,7 +25,7 @@ public class EditorStateCommand {
 
     @ShellMethod(key = {"export"}, value = "Exports all the settings to load again.", group = "Workflow")
     @ShellMethodAvailability("exportAvailability")
-    public void exportSequences(@ShellOption(value = {"file"}) String filePath) {
+    public void exportSequences(@ShellOption(value = {"file"}, defaultValue = "") String filePath) {
 
         final JsonObject root = new JsonObject();
         // Add input / audio
@@ -37,7 +37,7 @@ public class EditorStateCommand {
         root.add("editor_state", Editor.INSTANCE.toJson());
 
 
-        final File fileOutput = filePath == null ? SAVE_FILE : new File(filePath).canWrite() ? new File(filePath) : SAVE_FILE;
+        final File fileOutput = filePath.isEmpty() ? SAVE_FILE : new File(filePath).canWrite() ? new File(filePath) : SAVE_FILE;
         try {
             FileUtils.write(fileOutput, GSON.toJson(root), StandardCharsets.UTF_8);
         } catch (IOException e) {
@@ -46,9 +46,9 @@ public class EditorStateCommand {
     }
 
     @ShellMethod(key = {"import"}, value = "Imports all the settings to load again.", group = "Workflow")
-    public void importSequences(@ShellOption(value = {"file"}) String filePath) {
+    public void importSequences(@ShellOption(value = {"file"}, defaultValue = "") String filePath) {
         try {
-            final String json = FileUtils.readFileToString(filePath == null ? SAVE_FILE : new File(filePath), StandardCharsets.UTF_8);
+            final String json = FileUtils.readFileToString(filePath.isEmpty() ? SAVE_FILE : new File(filePath), StandardCharsets.UTF_8);
             final JsonObject root = JsonParser.parseString(json).getAsJsonObject();
 
             CLIArgs.setInput(root.get("source_video").getAsString());
