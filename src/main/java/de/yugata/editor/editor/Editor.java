@@ -74,7 +74,7 @@ public class Editor {
      * Throws an IllegalArgumentException if the beat queue is empty.
      * Then edits the video with the given inputs.
      */
-    public void runEditing() {
+    public void runEditing(final boolean useSegments) {
         if (timeBetweenBeats.isEmpty()) {
             throw new IllegalArgumentException("The audio has not been analysed or no beats have been detected, in that case adjust the threshold.");
         }
@@ -82,10 +82,21 @@ public class Editor {
         final File inputFile = new File(CLIArgs.getInput());
         final File outputFile = new File(inputFile.getName() + "_edit.mp4");
 
+        final VideoEditor editor = new VideoEditorBuilder()
+                .setVideoPath(CLIArgs.getInput())
+                .setAudioPath(CLIArgs.getAudioInput())
+                .setOutputFile(outputFile)
+                .setFlags(editingFlags)
+                .setIntroStart(introStart)
+                .setIntroEnd(intoEnd)
+                .setTimeBetweenBeats(new ArrayDeque<>(timeBetweenBeats))
+                .setVideoTimeStamps(new ArrayList<>(timeStamps))
+                .createVideoEditor();
 
-        final VideoEditor editor = new VideoEditor(outputFile, CLIArgs.getInput(), CLIArgs.getAudioInput(), new ArrayDeque<>(timeBetweenBeats), new ArrayList<>(timeStamps));
-        editor.edit(editingFlags, introStart, intoEnd);
+        editor.edit(useSegments);
     }
+
+
 
     /**
      * Checks whether the editing process is possible.
