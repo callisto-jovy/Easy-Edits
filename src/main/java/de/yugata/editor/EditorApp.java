@@ -24,7 +24,7 @@ public class EditorApp {
         Loader.load(ffmpeg.class);
         FFmpegLogCallback.set();
 
-        //av_log_set_level(AV_LOG_PANIC);
+        av_log_set_level(AV_LOG_PANIC);
 
         final SpringApplicationBuilder builder = new SpringApplicationBuilder(EditorApp.class)
                 .bannerMode(Banner.Mode.OFF)

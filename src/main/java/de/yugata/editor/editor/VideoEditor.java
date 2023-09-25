@@ -8,6 +8,7 @@ import org.bytedeco.javacv.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class VideoEditor {
 
@@ -36,13 +37,29 @@ public class VideoEditor {
     private InputVideo inputVideo;
 
 
+    private long introStart, introEnd;
+
+    private EnumSet<EditingFlag> editingFlags;
+
     private final File outputFile;
 
-    public VideoEditor(final File outputFile, final String videoInput, final String audioInput, final Queue<Double> timeBetweenBeats, final List<Long> videoTimeStamps) {
-        this.videoPath = videoInput;
-        this.audioPath = audioInput;
+    public VideoEditor(final String videoPath,
+                       final String audioPath,
+                       final File outputFile,
+                       final Queue<Double> timeBetweenBeats,
+                       final List<Long> videoTimeStamps,
+                       final EnumSet<EditingFlag> flags,
+                       final long introStart,
+                       final long introEnd) {
+
+        this.videoPath = videoPath;
+        this.audioPath = audioPath;
         this.timeBetweenBeats = timeBetweenBeats;
         this.videoTimeStamps = videoTimeStamps;
+        this.editingFlags = flags;
+        this.introStart = introStart;
+        this.introEnd = introEnd;
+
         if (outputFile.exists()) {
             this.outputFile = new File(outputFile.getParent(), UUID.randomUUID() + outputFile.getName());
         } else {
@@ -86,21 +103,26 @@ public class VideoEditor {
         }
     }
 
-    public void edit(final EnumSet<EditingFlag> flags, final long introStart, final long introEnd) {
+
+    public void edit(final boolean useSegments) {
         // Write the segment files that will be stitched together.
-        final List<File> segments = this.writeSegments(flags);
+        final List<File> segments;
 
-        /*
-        final List<File> segments = Arrays.stream(Editor.WORKING_DIRECTORY.listFiles()).sorted(Comparator.comparingInt(value -> Integer.parseInt(value.getName().substring("segment ".length(), value.getName().lastIndexOf("."))))).collect(Collectors.toList());
+        if (useSegments) {
+            initFrameGrabber();
+            releaseFrameGrabber();
 
-        this.initFrameGrabber();
-        this.releaseFrameGrabber();
+            segments = Arrays.stream(Editor.WORKING_DIRECTORY.listFiles())
+                    .sorted(Comparator.comparingInt(value -> Integer.parseInt(value.getName().substring("segment ".length(), value.getName().lastIndexOf(".")))))
+                    .collect(Collectors.toList());
+        } else {
+            segments = writeSegments();
+        }
 
-         */
 
         // Recorder for the final product & audio grabber to overlay the audio
         try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath);
-             final FFmpegFrameRecorder recorder = getRecorder(outputFile, flags)) {
+             final FFmpegFrameRecorder recorder = getRecorder(outputFile)) {
 
             // Start grabbing the audio, we need this for the sample rate.
             audioGrabber.start();
@@ -124,7 +146,7 @@ public class VideoEditor {
 
             final List<FFmpegFrameFilter> videoFilters = new ArrayList<>();
 
-            if (flags.contains(EditingFlag.INTERPOLATE_FRAMES)) {
+            if (editingFlags.contains(EditingFlag.INTERPOLATE_FRAMES)) {
                 final int fps = EditingFlag.INTERPOLATE_FRAMES.getSetting();
                 final int factor = (int) (fps / recorder.getFrameRate());
 
@@ -135,7 +157,7 @@ public class VideoEditor {
                 videoFilters.add(interpolateFilter);
             }
 
-            if (flags.contains(EditingFlag.FADE_OUT_VIDEO)) {
+            if (editingFlags.contains(EditingFlag.FADE_OUT_VIDEO)) {
                 final int fadeOutLength = EditingFlag.FADE_OUT_VIDEO.getSetting();
                 final int fadeOutStart = (int) ((audioGrabber.getLengthInTime() / 1000000L) - fadeOutLength);
                 final FFmpegFrameFilter videoFadeFilter = createVideoFilter(String.format("fade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength), recorder.getPixelFormat());
@@ -143,7 +165,7 @@ public class VideoEditor {
                 videoFilters.add(videoFadeFilter);
             }
 
-            if (flags.contains(EditingFlag.ZOOM_IN)) {
+            if (editingFlags.contains(EditingFlag.ZOOM_IN)) {
 
                 final FFmpegFrameFilter zoomAnimation = createVideoFilter("zoompan=z='min(pzoom+0.00213,2.13)':x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2):d=1:fps=60", recorder.getPixelFormat());
                 zoomAnimation.start();
@@ -153,11 +175,6 @@ public class VideoEditor {
             //    final FFmpegFrameFilter sharpen = createVideoFilter("smartblur=1.5:-0.35:-3.5:0.65:0.25:2.0", recorder.getPixelFormat());
             //   sharpen.start();
             // videoFilters.add(sharpen);
-
-
-            // Array with all our video filters. This is needed for the pushToFilters method. Otherwise, the filters would be a new array every time.
-            // This is just how java works.
-            //   final FFmpegFrameFilter[] videoFiltersArray = videoFilters.toArray(new FFmpegFrameFilter[]{});
 
 
             //TODO: Not available in our javacv build
@@ -174,7 +191,7 @@ public class VideoEditor {
                 segmentGrabber.setPixelFormat(recorder.getPixelFormat());
                 segmentGrabber.start();
 
-                if (flags.contains(EditingFlag.FADE_TRANSITION)) {
+                if (editingFlags.contains(EditingFlag.FADE_TRANSITION)) {
                     final FFmpegFrameFilter fadeIn = createVideoFilter(String.format("fade=t=in:st=%dus:d=%dms", 0, EditingFlag.FADE_TRANSITION.getSetting()), recorder.getPixelFormat());
                     fadeIn.start();
                     videoFilters.add(fadeIn);
@@ -188,7 +205,7 @@ public class VideoEditor {
                     pushToFilters(videoFrame, recorder, videoFiltersArray);
                 }
 
-                if (flags.contains(EditingFlag.FADE_TRANSITION)) {
+                if (editingFlags.contains(EditingFlag.FADE_TRANSITION)) {
                     videoFilters.get(videoFilters.size() - 1).close();
                     videoFilters.remove(videoFilters.size() - 1);
                 }
@@ -201,10 +218,11 @@ public class VideoEditor {
             final List<FFmpegFrameFilter> audioFilters = new ArrayList<>();
 
 
-            if (flags.contains(EditingFlag.FADE_OUT_VIDEO)) {
+            if (editingFlags.contains(EditingFlag.FADE_OUT_VIDEO)) {
                 final int fadeOutLength = EditingFlag.FADE_OUT_VIDEO.getSetting();
                 final int fadeOutStart = (int) ((audioGrabber.getLengthInTime() / 1000000L) - fadeOutLength);
                 final FFmpegFrameFilter audioFadeFilter = createAudioFilter(String.format("afade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength));
+                audioFadeFilter.start();
                 audioFilters.add(audioFadeFilter);
             }
 
@@ -226,7 +244,7 @@ public class VideoEditor {
         }
     }
 
-    private List<File> writeSegments(final EnumSet<EditingFlag> flags) {
+    private List<File> writeSegments() {
         this.initFrameGrabber();
 
         //TODO: We could just read the files in the dir & sort them based on their name?
@@ -238,7 +256,7 @@ public class VideoEditor {
         // The time one frame takes in ms.
         final double frameTime = 1000 / frameRate;
 
-        if (flags.contains(EditingFlag.SHUFFLE_SEQUENCES)) {
+        if (editingFlags.contains(EditingFlag.SHUFFLE_SEQUENCES)) {
             Collections.shuffle(videoTimeStamps);
         }
 
@@ -261,7 +279,7 @@ public class VideoEditor {
                 // Write a new segment to disk
                 final File segmentFile = new File(Editor.WORKING_DIRECTORY, String.format("segment %d.mp4", nextStamp));
                 segmentFiles.add(segmentFile); // Add the file to the segments.
-                final FFmpegFrameRecorder recorder = getRecorder(segmentFile, flags);
+                final FFmpegFrameRecorder recorder = getRecorder(segmentFile);
 
                 // Time passed in frame times.
                 double localMs = 0;
@@ -291,7 +309,7 @@ public class VideoEditor {
     }
 
 
-    private FFmpegFrameRecorder getRecorder(final File outputFile, final EnumSet<EditingFlag> flags) throws FFmpegFrameRecorder.Exception {
+    private FFmpegFrameRecorder getRecorder(final File outputFile) throws FFmpegFrameRecorder.Exception {
         final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(outputFile, inputVideo.width(), inputVideo.height(), 2);
 
         recorder.setFormat("mp4");
@@ -300,14 +318,14 @@ public class VideoEditor {
         // Preserve the color range for the HDR video files.
         // This lets us tone-map the hdr content later on if we want to.
         //TODO: get this from the grabber
-        if (flags.contains(EditingFlag.WRITE_HDR_OPTIONS)) {
+        if (editingFlags.contains(EditingFlag.WRITE_HDR_OPTIONS)) {
             recorder.setVideoOption("color_range", "tv");
             recorder.setVideoOption("colorspace", "bt2020nc");
             recorder.setVideoOption("color_primaries", "bt2020");
             recorder.setVideoOption("color_trc", "smpte2084");
         }
 
-        if (flags.contains(EditingFlag.BEST_QUALITY)) {
+        if (editingFlags.contains(EditingFlag.BEST_QUALITY)) {
             recorder.setVideoQuality(EditingFlag.BEST_QUALITY.getSetting()); // best quality --> Produces big files
             recorder.setVideoOption("cq", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
             recorder.setOption("preset", "slow");

@@ -7,14 +7,15 @@ import org.springframework.shell.Availability;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
 import org.springframework.shell.standard.ShellMethodAvailability;
+import org.springframework.shell.standard.ShellOption;
 
 @ShellComponent
 public class EditCommand {
 
     @ShellMethod(value = "Start the editing process", group = "Workflow")
     @ShellMethodAvailability("editingAvailability")
-    public void edit() {
-        Editor.INSTANCE.runEditing();
+    public void edit(@ShellOption(value = {"use", "segments"}, defaultValue = "false") boolean useSegments) {
+        Editor.INSTANCE.runEditing(useSegments);
     }
 
     public Availability editingAvailability() {
