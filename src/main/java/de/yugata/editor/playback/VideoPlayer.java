@@ -16,8 +16,19 @@ public class VideoPlayer {
     private KeyboardThread keyboardThread;
 
     public VideoPlayer() {
+    }
+
+
+    public void start() {
+        if (videoCanvas != null)
+            this.videoCanvas.dispose();
+        this.videoCanvas = new VideoCanvas();
+
         this.keyboardThread = new KeyboardThread(this);
+        this.keyboardThread.start();
+
         this.videoThread = new VideoThread(this);
+        this.videoThread.start();
     }
 
     private void checkCanvas() {
@@ -29,33 +40,6 @@ public class VideoPlayer {
     public void showImage(final Frame frame) {
         this.checkCanvas();
         this.videoCanvas.showImage(frame);
-    }
-
-    public void start() {
-        this.videoCanvas = new VideoCanvas(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
-                synchronized (videoThread) {
-                    videoThread.interrupt();
-                }
-
-                synchronized (keyboardThread) {
-                    keyboardThread.interrupt();
-                }
-            }
-        });
-
-
-        if (keyboardThread.getState() == Thread.State.TERMINATED)
-            this.keyboardThread.run();
-        else
-            this.keyboardThread.start();
-
-
-        if (videoThread.getState() == Thread.State.TERMINATED)
-            this.videoThread.run();
-        else
-            this.videoThread.start();
     }
 
     private boolean checkVideoThread() {
@@ -78,13 +62,15 @@ public class VideoPlayer {
             videoThread.pause();
     }
 
-    public void seek(long l) {
+    public void seek(SkipIntervalls intervall, int mul) {
         if (checkVideoThread())
-
-            videoThread.seek(l);
+            videoThread.seek(mul * intervall.getIntervall());
     }
 
+
     public void stop() {
+        this.videoCanvas.dispose();
+
         synchronized (videoThread) {
             videoThread.interrupt();
         }
@@ -92,12 +78,17 @@ public class VideoPlayer {
         synchronized (keyboardThread) {
             keyboardThread.interrupt();
         }
+
+        System.out.println("Stopped threads.");
     }
 
 
     public KeyEvent waitKey() throws InterruptedException {
         this.checkCanvas();
-        return videoCanvas.waitKey();
+
+        synchronized (keyboardThread) {
+            return videoCanvas.waitKey();
+        }
     }
 
     public void setIntro() {
