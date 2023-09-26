@@ -1,7 +1,5 @@
 package de.yugata.editor.playback;
 
-import de.yugata.editor.editor.Editor;
-
 import java.awt.event.KeyEvent;
 
 import static java.awt.event.KeyEvent.*;
@@ -14,14 +12,15 @@ public class KeyboardThread extends Thread {
         this.videoPlayer = videoPlayer;
     }
 
-    private static final long SKIP_SECONDS_10 = 10 * 1000000L;
-    private static final long SKIP_SECONDS_60 = 6 * SKIP_SECONDS_10;
+    private SkipIntervalls skipSeconds = SkipIntervalls.SKIP_TEN_SECONDS;
 
 
     @Override
     public void run() {
+        super.run();
+
         try {
-            while (!interrupted()) {
+            while (!Thread.interrupted()) {
 
                 final KeyEvent key = videoPlayer.waitKey();
 
@@ -31,21 +30,40 @@ public class KeyboardThread extends Thread {
                         videoPlayer.pause();
                         break;
 
+                    /* Second intervalls */
+                    case VK_1:
+                        setSkipSeconds(SkipIntervalls.SKIP_SECOND);
+                        break;
+
+                    case VK_2:
+                        setSkipSeconds(SkipIntervalls.SKIP_TWO_SECONDS);
+                        break;
+
+                    case VK_3:
+                        setSkipSeconds(SkipIntervalls.SKIP_FIVE_SECONDS);
+                        break;
+
+                    case VK_4:
+                        setSkipSeconds(SkipIntervalls.SKIP_TEN_SECONDS);
+                        break;
+                    /* End setting */
+
                     case VK_LEFT:
-                        videoPlayer.seek(-SKIP_SECONDS_10);
+                        videoPlayer.seek(skipSeconds, -1);
                         break;
 
                     case VK_RIGHT:
-                        videoPlayer.seek(SKIP_SECONDS_10);
+                        videoPlayer.seek(skipSeconds, 1);
                         break;
 
                     case VK_UP:
-                        videoPlayer.seek(SKIP_SECONDS_60);
+                        videoPlayer.seek(SkipIntervalls.SKIP_SIXTY_SECONDS, 1);
                         break;
 
                     case VK_DOWN:
-                        videoPlayer.seek(-SKIP_SECONDS_60);
+                        videoPlayer.seek(SkipIntervalls.SKIP_SIXTY_SECONDS, -1);
                         break;
+
 
                     // Ending the editing
                     case VK_ESCAPE:
@@ -69,5 +87,10 @@ public class KeyboardThread extends Thread {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    public void setSkipSeconds(SkipIntervalls skipSeconds) {
+        System.out.printf("Now skipping %s seconds %n", skipSeconds.name());
+        this.skipSeconds = skipSeconds;
     }
 }

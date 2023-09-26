@@ -7,10 +7,9 @@ import java.awt.event.WindowAdapter;
 
 public class VideoCanvas extends CanvasFrame {
 
-    public VideoCanvas(final WindowAdapter closing) {
+    public VideoCanvas() {
         super("Easy Editor");
-        this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        this.addWindowListener(closing);
+        this.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
     }
 
 }

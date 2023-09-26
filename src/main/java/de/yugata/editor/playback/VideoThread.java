@@ -89,7 +89,7 @@ public class VideoThread extends Thread {
         try {
             /* Grab frames until there are no more or the thread has been interrupted */
             Frame frame;
-            while ((frame = frameGrabber.grabAtFrameRate()) != null && !interrupted()) {
+            while ((frame = frameGrabber.grabAtFrameRate()) != null && !Thread.interrupted()) {
                 if (frame.image == null)
                     continue;
 
@@ -116,14 +116,6 @@ public class VideoThread extends Thread {
         }
     }
 
-    public void stopGrabber() {
-        try {
-            frameGrabber.stop();
-        } catch (FFmpegFrameGrabber.Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     public void pause() {
         // Unpause
         if (paused) {
@@ -141,8 +133,11 @@ public class VideoThread extends Thread {
      */
     public void seek(final long amount) {
         try {
-            frameGrabber.setTimestamp(frameGrabber.getTimestamp() + amount);
+            long prevTimeStamp = frameGrabber.getTimestamp();
+            frameGrabber.setTimestamp(prevTimeStamp + amount);
             frameGrabber.resetStartTime();
+            long timeSeeked = frameGrabber.getTimestamp() - prevTimeStamp;
+            System.out.println("timeSeeked = " + timeSeeked);
         } catch (FFmpegFrameGrabber.Exception ex) {
             throw new RuntimeException(ex);
         }
