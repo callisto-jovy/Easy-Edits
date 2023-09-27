@@ -2,7 +2,6 @@ package de.yugata.editor.editor;
 
 import de.yugata.editor.model.InputVideo;
 import de.yugata.editor.util.FFmpegUtil;
-import org.bytedeco.ffmpeg.global.avutil;
 import org.bytedeco.javacv.*;
 
 import java.io.File;
@@ -67,6 +66,7 @@ public class VideoEditor {
         }
     }
 
+
     private void initFrameGrabber() {
         if (frameGrabber == null) {
             try {
@@ -121,8 +121,7 @@ public class VideoEditor {
 
 
         // Recorder for the final product & audio grabber to overlay the audio
-        try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath);
-             final FFmpegFrameRecorder recorder = getRecorder(outputFile)) {
+        try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath); final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(outputFile, editingFlags, inputVideo)) {
 
             // Start grabbing the audio, we need this for the sample rate.
             audioGrabber.start();
@@ -146,31 +145,8 @@ public class VideoEditor {
 
             final List<FFmpegFrameFilter> videoFilters = new ArrayList<>();
 
-            if (editingFlags.contains(EditingFlag.INTERPOLATE_FRAMES)) {
-                final int fps = EditingFlag.INTERPOLATE_FRAMES.getSetting();
-                final int factor = (int) (fps / recorder.getFrameRate());
+            populateVideoFilters(videoFilters, audioGrabber.getLengthInTime(), recorder.getPixelFormat());
 
-                final String videoFilter = String.format("minterpolate=fps=%d,tblend=all_mode=average,setpts=%d*PTS", fps, factor);
-
-                final FFmpegFrameFilter interpolateFilter = createVideoFilter(videoFilter, recorder.getPixelFormat());
-                interpolateFilter.start();
-                videoFilters.add(interpolateFilter);
-            }
-
-            if (editingFlags.contains(EditingFlag.FADE_OUT_VIDEO)) {
-                final int fadeOutLength = EditingFlag.FADE_OUT_VIDEO.getSetting();
-                final int fadeOutStart = (int) ((audioGrabber.getLengthInTime() / 1000000L) - fadeOutLength);
-                final FFmpegFrameFilter videoFadeFilter = createVideoFilter(String.format("fade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength), recorder.getPixelFormat());
-                videoFadeFilter.start();
-                videoFilters.add(videoFadeFilter);
-            }
-
-            if (editingFlags.contains(EditingFlag.ZOOM_IN)) {
-
-                final FFmpegFrameFilter zoomAnimation = createVideoFilter("zoompan=z='min(pzoom+0.00213,2.13)':x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2):d=1:fps=60", recorder.getPixelFormat());
-                zoomAnimation.start();
-                videoFilters.add(zoomAnimation);
-            }
 
             //    final FFmpegFrameFilter sharpen = createVideoFilter("smartblur=1.5:-0.35:-3.5:0.65:0.25:2.0", recorder.getPixelFormat());
             //   sharpen.start();
@@ -179,20 +155,18 @@ public class VideoEditor {
 
             //TODO: Not available in our javacv build
             //final FFmpegFrameFilter colorCorrection = createVideoFilter("setpts=N,eq=brightness=0.1:saturation=3:gamma=1, curves=m='0/0,0.5/0.8,1/1'");
-            //final FFmpegFrameFilter toneMapping = createVideoFilter("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p");
 
 
             for (final File segment : segments) {
                 final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(segment);
-                segmentGrabber.setOption("allowed_extensions", "ALL");
-                segmentGrabber.setOption("hwaccel", "cuda");
-                segmentGrabber.setVideoBitrate(0);
+                FFmpegUtil.configureGrabber(segmentGrabber);
+
                 segmentGrabber.setVideoCodecName("h265_cuvid");
                 segmentGrabber.setPixelFormat(recorder.getPixelFormat());
                 segmentGrabber.start();
 
                 if (editingFlags.contains(EditingFlag.FADE_TRANSITION)) {
-                    final FFmpegFrameFilter fadeIn = createVideoFilter(String.format("fade=t=in:st=%dus:d=%dms", 0, EditingFlag.FADE_TRANSITION.getSetting()), recorder.getPixelFormat());
+                    final FFmpegFrameFilter fadeIn = FFmpegUtil.createVideoFilter(String.format("fade=t=in:st=%dus:d=%dms", 0, EditingFlag.FADE_TRANSITION.getSetting()), inputVideo, recorder.getPixelFormat());
                     fadeIn.start();
                     videoFilters.add(fadeIn);
                 }
@@ -221,7 +195,7 @@ public class VideoEditor {
             if (editingFlags.contains(EditingFlag.FADE_OUT_VIDEO)) {
                 final int fadeOutLength = EditingFlag.FADE_OUT_VIDEO.getSetting();
                 final int fadeOutStart = (int) ((audioGrabber.getLengthInTime() / 1000000L) - fadeOutLength);
-                final FFmpegFrameFilter audioFadeFilter = createAudioFilter(String.format("afade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength));
+                final FFmpegFrameFilter audioFadeFilter = FFmpegUtil.createAudioFilter(String.format("afade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength));
                 audioFadeFilter.start();
                 audioFilters.add(audioFadeFilter);
             }
@@ -247,7 +221,6 @@ public class VideoEditor {
     private List<File> writeSegments() {
         this.initFrameGrabber();
 
-        //TODO: We could just read the files in the dir & sort them based on their name?
         final List<File> segmentFiles = new ArrayList<>();
 
 
@@ -256,6 +229,7 @@ public class VideoEditor {
         // The time one frame takes in ms.
         final double frameTime = 1000 / frameRate;
 
+        // Shuffle the sequences if the flag is toggled.
         if (editingFlags.contains(EditingFlag.SHUFFLE_SEQUENCES)) {
             Collections.shuffle(videoTimeStamps);
         }
@@ -279,7 +253,7 @@ public class VideoEditor {
                 // Write a new segment to disk
                 final File segmentFile = new File(Editor.WORKING_DIRECTORY, String.format("segment %d.mp4", nextStamp));
                 segmentFiles.add(segmentFile); // Add the file to the segments.
-                final FFmpegFrameRecorder recorder = getRecorder(segmentFile);
+                final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(segmentFile, editingFlags, inputVideo);
 
                 // Time passed in frame times.
                 double localMs = 0;
@@ -309,66 +283,30 @@ public class VideoEditor {
     }
 
 
-    private FFmpegFrameRecorder getRecorder(final File outputFile) throws FFmpegFrameRecorder.Exception {
-        final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(outputFile, inputVideo.width(), inputVideo.height(), 2);
+    private void populateVideoFilters(final List<FFmpegFrameFilter> videoFilters, final long audioTime, final int pixelFormat) throws FFmpegFrameFilter.Exception {
+        if (editingFlags.contains(EditingFlag.INTERPOLATE_FRAMES)) {
+            final int fps = EditingFlag.INTERPOLATE_FRAMES.getSetting();
+            final int factor = (int) (fps / inputVideo.frameRate());
 
-        recorder.setFormat("mp4");
-        recorder.setVideoCodecName("h265_nvenc"); // Hardware-accelerated encoding.
+            final String videoFilter = String.format("minterpolate=fps=%d,tblend=all_mode=average,setpts=%d*PTS", fps, factor);
 
-        // Preserve the color range for the HDR video files.
-        // This lets us tone-map the hdr content later on if we want to.
-        //TODO: get this from the grabber
-        if (editingFlags.contains(EditingFlag.WRITE_HDR_OPTIONS)) {
-            recorder.setVideoOption("color_range", "tv");
-            recorder.setVideoOption("colorspace", "bt2020nc");
-            recorder.setVideoOption("color_primaries", "bt2020");
-            recorder.setVideoOption("color_trc", "smpte2084");
+            final FFmpegFrameFilter interpolateFilter = FFmpegUtil.createVideoFilter(videoFilter, inputVideo, pixelFormat);
+            interpolateFilter.start();
+            videoFilters.add(interpolateFilter);
         }
 
-        if (editingFlags.contains(EditingFlag.BEST_QUALITY)) {
-            recorder.setVideoQuality(EditingFlag.BEST_QUALITY.getSetting()); // best quality --> Produces big files
-            recorder.setVideoOption("cq", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
-            recorder.setOption("preset", "slow");
-            recorder.setVideoOption("profile", "high444");
-            recorder.setVideoOption("crf", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
-            recorder.setVideoOption("qmin", "0");
-            recorder.setVideoOption("qmax", "24");
-            recorder.setOption("tune", "hq");
-            recorder.setOption("bf", "2");
-            recorder.setOption("lookahead", "8");
-            recorder.setOption("rc", "vbr");
-
-            //  recorder.setOption("b:v", "0");
+        if (editingFlags.contains(EditingFlag.FADE_OUT_VIDEO)) {
+            final int fadeOutLength = EditingFlag.FADE_OUT_VIDEO.getSetting();
+            final int fadeOutStart = (int) ((audioTime / 1000000L) - fadeOutLength);
+            final FFmpegFrameFilter videoFadeFilter = FFmpegUtil.createVideoFilter(String.format("fade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength), inputVideo, pixelFormat);
+            videoFadeFilter.start();
+            videoFilters.add(videoFadeFilter);
         }
 
-
-        // One of the pixel formats supported by h264 nvenc
-        recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
-        recorder.setFrameRate(inputVideo.frameRate());
-        recorder.setSampleRate(inputVideo.sampleRate());
-        // Select the "highest" bitrate.
-        recorder.setVideoBitrate(0); // max bitrate
-
-        recorder.start();
-
-        return recorder;
-    }
-
-
-    private FFmpegFrameFilter createVideoFilter(final String videoFilter, final int pixelFormat) throws FFmpegFrameFilter.Exception {
-        final FFmpegFrameFilter videoFrameFilter = new FFmpegFrameFilter(videoFilter, inputVideo.width(), inputVideo.height());
-        videoFrameFilter.setFrameRate(inputVideo.frameRate());
-        videoFrameFilter.setPixelFormat(pixelFormat);
-        return videoFrameFilter;
-    }
-
-
-    private FFmpegFrameFilter createAudioFilter(final String audioFilter) {
-        try (final FFmpegFrameFilter audioFrameFilter = new FFmpegFrameFilter(audioFilter, 2)) {
-            audioFrameFilter.start();
-            return audioFrameFilter;
-        } catch (FrameFilter.Exception e) {
-            throw new RuntimeException(e);
+        if (editingFlags.contains(EditingFlag.ZOOM_IN)) {
+            final FFmpegFrameFilter zoomAnimation = FFmpegUtil.createVideoFilter("zoompan=z='min(pzoom+0.00213,2.13)':x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2):d=1:fps=60", inputVideo, pixelFormat);
+            zoomAnimation.start();
+            videoFilters.add(zoomAnimation);
         }
     }
 

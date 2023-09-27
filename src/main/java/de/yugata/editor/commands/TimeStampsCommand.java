@@ -66,7 +66,7 @@ public class TimeStampsCommand {
                             return "This stamp currently is marked as null or is out of bounds.";
                         }
 
-                        VideoPlayer.INSTANCE.seek(Editor.INSTANCE.timeStampAt(index));
+                        VideoPlayer.INSTANCE.seekTo(Editor.INSTANCE.timeStampAt(index));
                         return "Seeking to stamp";
                     }
                     return "Unknown option.";

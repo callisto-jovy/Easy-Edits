@@ -2,6 +2,7 @@ package de.yugata.editor.playback;
 
 import de.yugata.editor.editor.Editor;
 import de.yugata.editor.model.CLIArgs;
+import de.yugata.editor.util.FFmpegUtil;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;
@@ -70,9 +71,7 @@ public class VideoThread extends Thread {
                 return frame;
             }
         };
-
-        frameGrabber.setOption("allowed_extensions", "ALL");
-        frameGrabber.setOption("hwaccel", "cuda");
+        FFmpegUtil.configureGrabber(frameGrabber);
         frameGrabber.setVideoCodecName("hevc_cuvid");
 
         try {
@@ -136,8 +135,6 @@ public class VideoThread extends Thread {
             long prevTimeStamp = frameGrabber.getTimestamp();
             frameGrabber.setTimestamp(prevTimeStamp + amount);
             frameGrabber.resetStartTime();
-            long timeSeeked = frameGrabber.getTimestamp() - prevTimeStamp;
-            System.out.println("timeSeeked = " + timeSeeked);
         } catch (FFmpegFrameGrabber.Exception ex) {
             throw new RuntimeException(ex);
         }
@@ -145,5 +142,14 @@ public class VideoThread extends Thread {
 
     public long getCurrentTimeStamp() {
         return frameGrabber.getTimestamp();
+    }
+
+    public void seekTo(long stamp) {
+        try {
+            frameGrabber.setTimestamp(stamp);
+            frameGrabber.resetStartTime();
+        } catch (FFmpegFrameGrabber.Exception ex) {
+            throw new RuntimeException(ex);
+        }
     }
 }
