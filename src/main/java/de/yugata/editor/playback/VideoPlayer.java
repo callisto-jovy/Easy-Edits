@@ -67,6 +67,10 @@ public class VideoPlayer {
             videoThread.seek(mul * intervall.getIntervall());
     }
 
+    public void seekTo(final long stamp) {
+        if (checkVideoThread())
+            videoThread.seekTo(stamp);
+    }
 
     public void stop() {
         this.videoCanvas.dispose();
