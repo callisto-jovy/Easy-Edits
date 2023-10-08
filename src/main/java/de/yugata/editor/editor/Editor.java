@@ -54,7 +54,7 @@ public class Editor {
      * Default constructor, creates a working temp.
      */
     public Editor() {
-        this.editingFlags = EnumSet.of(EditingFlag.BEST_QUALITY, EditingFlag.WRITE_HDR_OPTIONS);
+        this.editingFlags = EnumSet.of(EditingFlag.BEST_QUALITY, EditingFlag.WRITE_HDR_OPTIONS, EditingFlag.FADE_OUT_VIDEO);
     }
 
     /**
