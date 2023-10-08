@@ -76,6 +76,7 @@ public class VideoPlayer {
         this.videoCanvas.dispose();
 
         synchronized (videoThread) {
+            videoThread.notifyAll();
             videoThread.interrupt();
         }
 

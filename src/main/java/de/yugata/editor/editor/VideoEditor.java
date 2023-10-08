@@ -9,6 +9,12 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.bytedeco.ffmpeg.global.avcodec.AV_CODEC_ID_HEVC;
+import static org.bytedeco.ffmpeg.global.avutil.*;
+
+/**
+ * TODO: This needs documentation & a cleanup
+ */
 public class VideoEditor {
 
     private final Queue<Double> timeBetweenBeats;
@@ -64,13 +70,25 @@ public class VideoEditor {
         } else {
             this.outputFile = outputFile;
         }
+
+        if (flags.contains(EditingFlag.PRINT_DEBUG)) {
+            FFmpegLogCallback.set();
+            av_log_set_level(AV_LOG_PRINT_LEVEL);
+        } else {
+            av_log_set_level(AV_LOG_PANIC);
+        }
     }
 
 
     private void initFrameGrabber() {
         if (frameGrabber == null) {
             try {
-                this.frameGrabber = FFmpegUtil.createGrabber(videoPath);
+                this.frameGrabber = new FFmpegFrameGrabber(videoPath);
+                FFmpegUtil.configureGrabber(frameGrabber);
+
+                frameGrabber.setVideoCodecName("hevc_cuvid");
+                frameGrabber.start();
+
                 this.inputVideo = new InputVideo(
                         frameGrabber.getImageWidth(),
                         frameGrabber.getImageHeight(),
@@ -115,13 +133,20 @@ public class VideoEditor {
             segments = Arrays.stream(Editor.WORKING_DIRECTORY.listFiles())
                     .sorted(Comparator.comparingInt(value -> Integer.parseInt(value.getName().substring("segment ".length(), value.getName().lastIndexOf(".")))))
                     .collect(Collectors.toList());
+
         } else {
             segments = writeSegments();
         }
 
 
+        this.initFrameGrabber();
+
         // Recorder for the final product & audio grabber to overlay the audio
-        try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath); final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(outputFile, editingFlags, inputVideo)) {
+        try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath);
+             final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(outputFile, editingFlags, inputVideo)) {
+            //   recorder.setPixelFormat(inputVideo.);
+           // recorder.setPixelFormat(frameGrabber.getPixelFormat());
+            recorder.start();
 
             // Start grabbing the audio, we need this for the sample rate.
             audioGrabber.start();
@@ -129,16 +154,15 @@ public class VideoEditor {
             // Add the intro in front
 
             if (introStart != -1 && introEnd != -1) {
-                this.initFrameGrabber();
                 this.frameGrabber.setTimestamp(introStart);
 
                 Frame introFrame;
                 while ((introFrame = frameGrabber.grab()) != null && frameGrabber.getTimestamp() < introEnd) {
                     recorder.record(introFrame);
                 }
-
-                this.releaseFrameGrabber();
             }
+
+            this.releaseFrameGrabber();
 
 
             /* Configuring the video filters */
@@ -160,8 +184,8 @@ public class VideoEditor {
             for (final File segment : segments) {
                 final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(segment);
                 FFmpegUtil.configureGrabber(segmentGrabber);
-
-                segmentGrabber.setVideoCodecName("h265_cuvid");
+                //       segmentGrabber.setVideoCodecName("h265_cuvid");
+                segmentGrabber.setVideoCodecName("hevc_cuvid");
                 segmentGrabber.setPixelFormat(recorder.getPixelFormat());
                 segmentGrabber.start();
 
@@ -176,7 +200,7 @@ public class VideoEditor {
                 // grab the frames & send them to the filters
                 Frame videoFrame;
                 while ((videoFrame = segmentGrabber.grabImage()) != null) {
-                    pushToFilters(videoFrame, recorder, videoFiltersArray);
+                    FFmpegUtil.pushToFilters(videoFrame, recorder, videoFiltersArray);
                 }
 
                 if (editingFlags.contains(EditingFlag.FADE_TRANSITION)) {
@@ -204,7 +228,7 @@ public class VideoEditor {
             Frame audioFrame;
             while ((audioFrame = audioGrabber.grab()) != null) {
                 recorder.setTimestamp(introStart == -1 ? audioFrame.timestamp : introStart + audioFrame.timestamp);
-                pushToFilters(audioFrame, recorder, audioFilters.toArray(new FFmpegFrameFilter[]{}));
+                FFmpegUtil.pushToFilters(audioFrame, recorder, audioFilters.toArray(new FFmpegFrameFilter[]{}));
             }
 
             /* Clean up resources */
@@ -254,6 +278,12 @@ public class VideoEditor {
                 final File segmentFile = new File(Editor.WORKING_DIRECTORY, String.format("segment %d.mp4", nextStamp));
                 segmentFiles.add(segmentFile); // Add the file to the segments.
                 final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(segmentFile, editingFlags, inputVideo);
+        //        recorder.setPixelFormat(frameGrabber.getPixelFormat());
+                //    recorder.setPixelFormat(frameGrabber.getPixelFormat());
+                //   recorder.setVideoCodec(AV_CODEC_ID_H265);
+
+                recorder.start();
+
 
                 // Time passed in frame times.
                 double localMs = 0;
@@ -284,6 +314,25 @@ public class VideoEditor {
 
 
     private void populateVideoFilters(final List<FFmpegFrameFilter> videoFilters, final long audioTime, final int pixelFormat) throws FFmpegFrameFilter.Exception {
+        //TODO: move the filters to their own enum with a functional interface
+
+        if (editingFlags.contains(EditingFlag.FADE_OUT_VIDEO)) {
+            final int fadeOutLength = EditingFlag.FADE_OUT_VIDEO.getSetting();
+            final int fadeOutStart = (int) ((audioTime / 1000000L) - fadeOutLength);
+
+
+            final FFmpegFrameFilter videoFadeFilter = FFmpegUtil.createVideoFilter(String.format("fade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength), inputVideo, pixelFormat);
+            videoFadeFilter.start();
+            videoFilters.add(videoFadeFilter);
+
+            final String textFilter = String.format("drawtext=fontcolor=ffffff:enable='between(t,%d,%d):fontsize=128:fontfile=%s:text=yugata:x=(w-text_w)/2:y=(h-text_h)/2", fadeOutStart, fadeOutStart + fadeOutLength, FFmpegUtil.getFontFile());
+            final FFmpegFrameFilter watermarkFilter = FFmpegUtil.createVideoFilter(textFilter, inputVideo, pixelFormat);
+            watermarkFilter.start();
+            videoFilters.add(watermarkFilter);
+
+        }
+
+
         if (editingFlags.contains(EditingFlag.INTERPOLATE_FRAMES)) {
             final int fps = EditingFlag.INTERPOLATE_FRAMES.getSetting();
             final int factor = (int) (fps / inputVideo.frameRate());
@@ -295,14 +344,6 @@ public class VideoEditor {
             videoFilters.add(interpolateFilter);
         }
 
-        if (editingFlags.contains(EditingFlag.FADE_OUT_VIDEO)) {
-            final int fadeOutLength = EditingFlag.FADE_OUT_VIDEO.getSetting();
-            final int fadeOutStart = (int) ((audioTime / 1000000L) - fadeOutLength);
-            final FFmpegFrameFilter videoFadeFilter = FFmpegUtil.createVideoFilter(String.format("fade=t=out:st=%d:d=%d", fadeOutStart - 1, fadeOutLength), inputVideo, pixelFormat);
-            videoFadeFilter.start();
-            videoFilters.add(videoFadeFilter);
-        }
-
         if (editingFlags.contains(EditingFlag.ZOOM_IN)) {
             final FFmpegFrameFilter zoomAnimation = FFmpegUtil.createVideoFilter("zoompan=z='min(pzoom+0.00213,2.13)':x=iw/2-(iw/zoom/2):y=ih/2-(ih/zoom/2):d=1:fps=60", inputVideo, pixelFormat);
             zoomAnimation.start();
@@ -310,36 +351,4 @@ public class VideoEditor {
         }
     }
 
-
-    private void pushToFilters(final Frame frame, final FFmpegFrameRecorder recorder, final FFmpegFrameFilter... filters) {
-        try {
-            if (filters.length == 0) {
-                recorder.record(frame);
-                return;
-            }
-
-
-            // Feed the frame to the first filter
-            filters[0].push(frame);
-            //
-            for (int i = 1; i < filters.length; i++) {
-                // Pull frames from predecessor
-                final FFmpegFrameFilter predecessor = filters[i - 1];
-                Frame processedFrame;
-
-                while ((processedFrame = predecessor.pull()) != null) {
-                    filters[i].push(processedFrame, predecessor.getPixelFormat());
-                }
-            }
-            // Grab the frames from the last filter...
-
-            final FFmpegFrameFilter finalFilter = filters[filters.length - 1];
-            Frame processedFrame;
-            while ((processedFrame = finalFilter.pull()) != null) {
-                recorder.record(processedFrame, finalFilter.getPixelFormat());
-            }
-        } catch (FFmpegFrameRecorder.Exception | FrameFilter.Exception e) {
-            e.printStackTrace();
-        }
-    }
 }

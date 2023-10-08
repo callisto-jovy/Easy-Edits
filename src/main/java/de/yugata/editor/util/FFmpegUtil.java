@@ -2,16 +2,56 @@ package de.yugata.editor.util;
 
 import de.yugata.editor.editor.EditingFlag;
 import de.yugata.editor.model.InputVideo;
+import org.bytedeco.ffmpeg.global.avcodec;
 import org.bytedeco.ffmpeg.global.avutil;
-import org.bytedeco.javacv.FFmpegFrameFilter;
-import org.bytedeco.javacv.FFmpegFrameGrabber;
-import org.bytedeco.javacv.FFmpegFrameRecorder;
-import org.bytedeco.javacv.FrameFilter;
+import org.bytedeco.javacv.*;
 
 import java.io.File;
 import java.util.EnumSet;
 
+/**
+ * TODO: This needs some documentation, not only for other, but also for myself.
+ */
 public class FFmpegUtil {
+
+
+    //TODO: Multiple fonts??
+    public static String getFontFile() {
+        // Our font file is in the resources, but ffmpeg needs an absolute path
+        return ClassLoader.getSystemClassLoader().getResource("Dalton.otf").getFile();
+    }
+
+    public static void pushToFilters(final Frame frame, final FFmpegFrameRecorder recorder, final FFmpegFrameFilter... filters) {
+        try {
+            if (filters.length == 0) {
+                recorder.record(frame);
+                return;
+            }
+
+
+            // Feed the frame to the first filter
+            filters[0].push(frame);
+            //
+            for (int i = 1; i < filters.length; i++) {
+                // Pull frames from predecessor
+                final FFmpegFrameFilter predecessor = filters[i - 1];
+                Frame processedFrame;
+
+                while ((processedFrame = predecessor.pull()) != null) {
+                    filters[i].push(processedFrame, predecessor.getPixelFormat());
+                }
+            }
+            // Grab the frames from the last filter...
+
+            final FFmpegFrameFilter finalFilter = filters[filters.length - 1];
+            Frame processedFrame;
+            while ((processedFrame = finalFilter.pull()) != null) {
+                recorder.record(processedFrame, finalFilter.getPixelFormat());
+            }
+        } catch (FFmpegFrameRecorder.Exception | FrameFilter.Exception e) {
+            e.printStackTrace();
+        }
+    }
 
 
     public static void configureGrabber(final FFmpegFrameGrabber grabber) {
@@ -67,7 +107,7 @@ public class FFmpegUtil {
             recorder.setVideoQuality(EditingFlag.BEST_QUALITY.getSetting()); // best quality --> Produces big files
             recorder.setVideoOption("cq", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
             recorder.setOption("preset", "slow");
-            recorder.setVideoOption("profile", "high444");
+            recorder.setVideoOption("profile", "main10");
             recorder.setVideoOption("crf", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
             recorder.setVideoOption("qmin", "0");
             recorder.setVideoOption("qmax", "0");
@@ -80,15 +120,15 @@ public class FFmpegUtil {
         }
 
 
-        // One of the pixel formats supported by h264 nvenc
+        recorder.setVideoCodec(avcodec.AV_CODEC_ID_HEVC);
         recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
+        // One of the pixel formats supported by h264 nvenc
+     //   recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
         recorder.setFrameRate(inputVideo.frameRate());
         recorder.setSampleRate(inputVideo.sampleRate());
         // Select the "highest" bitrate.
         recorder.setVideoBitrate(0); // max bitrate
         //   recorder.setVideoCodecName("h264_nvenc"); // Hardware-accelerated encoding.
-
-        recorder.start();
 
         return recorder;
     }

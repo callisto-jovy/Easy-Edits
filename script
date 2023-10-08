@@ -1,0 +1,5 @@
+audio --set "D:/out/edits/Joker/QKThr/qkthr_short.wav"
+video --set "D:/out/edits/Joker/Joker.2019.2160p.UHD.BluRay.x265.HDR.DD-EX.5.1-Pahe.in.mkv"
+peak --peak 0.5
+analyse-audio
+play
