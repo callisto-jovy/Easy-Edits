@@ -97,7 +97,6 @@ public class Editor {
     }
 
 
-
     /**
      * Checks whether the editing process is possible.
      *
@@ -212,6 +211,12 @@ public class Editor {
         setIntoEnd(root.get("intro_end").getAsLong());
         setIntroStart(root.get("intro_start").getAsLong());
 
+        final JsonObject editingOptions = root.getAsJsonObject("editing_flags");
+        editingFlags.clear();
+        editingOptions.asMap().forEach((key, value) -> {
+            if (value.getAsBoolean())
+                editingFlags.add(EditingFlag.valueOf(key));
+        });
     }
 
 
