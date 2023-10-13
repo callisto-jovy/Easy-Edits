@@ -4,6 +4,8 @@ import java.io.File;
 import java.util.*;
 
 public class VideoEditorBuilder {
+
+    private List<String> filters = new ArrayList<>();
     private String videoPath;
     private String audioPath;
     private File outputFile;
@@ -12,16 +14,6 @@ public class VideoEditorBuilder {
     private EnumSet<EditingFlag> flags = EnumSet.noneOf(EditingFlag.class);
 
     private long introStart = -1, introEnd = -1;
-
-    public VideoEditorBuilder setIntroStart(long introStart) {
-        this.introStart = introStart;
-        return this;
-    }
-
-    public VideoEditorBuilder setIntroEnd(long introEnd) {
-        this.introEnd = introEnd;
-        return this;
-    }
 
     public VideoEditorBuilder setVideoPath(String videoPath) {
         this.videoPath = videoPath;
@@ -53,7 +45,22 @@ public class VideoEditorBuilder {
         return this;
     }
 
+    public VideoEditorBuilder setFilters(List<String> filters) {
+        this.filters = filters;
+        return this;
+    }
+
+    public VideoEditorBuilder setIntroStart(long introStart) {
+        this.introStart = introStart;
+        return this;
+    }
+
+    public VideoEditorBuilder setIntroEnd(long introEnd) {
+        this.introEnd = introEnd;
+        return this;
+    }
+
     public VideoEditor createVideoEditor() {
-        return new VideoEditor(videoPath, audioPath, outputFile, timeBetweenBeats, videoTimeStamps, flags, introStart, introEnd);
+        return new VideoEditor(videoPath, audioPath, outputFile, timeBetweenBeats, videoTimeStamps, flags, filters, introStart, introEnd);
     }
 }

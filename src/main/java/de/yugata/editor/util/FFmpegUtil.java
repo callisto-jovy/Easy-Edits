@@ -2,11 +2,14 @@ package de.yugata.editor.util;
 
 import de.yugata.editor.editor.EditingFlag;
 import de.yugata.editor.model.InputVideo;
+import org.apache.commons.io.FileUtils;
 import org.bytedeco.ffmpeg.global.avcodec;
 import org.bytedeco.ffmpeg.global.avutil;
 import org.bytedeco.javacv.*;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.URL;
 import java.util.EnumSet;
 
 /**
@@ -17,8 +20,22 @@ public class FFmpegUtil {
 
     //TODO: Multiple fonts??
     public static String getFontFile() {
+        // Download the font file to the temp.
+        File dalton = new File("dalton.otf");
+
+        try {
+            if (!dalton.exists())
+                FileUtils.copyURLToFile(new URL("https://github.com/callisto-jovy/Fast-Edits/releases/download/external/Dalton.otf"), dalton);
+        } catch (IOException e) {
+            dalton = new File("C:/Windows/Fonts/Arial.ttf");
+            e.printStackTrace();
+        }
+
+
         // Our font file is in the resources, but ffmpeg needs an absolute path
-        return ClassLoader.getSystemClassLoader().getResource("Dalton.otf").getFile();
+        return dalton.getAbsolutePath()
+                .replace('\\', '/')
+                .replace(":", "\\:");
     }
 
     public static void pushToFilters(final Frame frame, final FFmpegFrameRecorder recorder, final FFmpegFrameFilter... filters) {
@@ -65,7 +82,8 @@ public class FFmpegUtil {
         final FFmpegFrameGrabber frameGrabber = new FFmpegFrameGrabber(filePath);
         frameGrabber.setOption("allowed_extensions", "ALL");
         frameGrabber.setOption("hwaccel", "cuda");
-        frameGrabber.setVideoCodecName("hevc_cuvid");
+        frameGrabber.setVideoCodecName("h264_cuvid");
+
         frameGrabber.setAudioStream(1);
         frameGrabber.start();
         return frameGrabber;
@@ -123,7 +141,7 @@ public class FFmpegUtil {
         recorder.setVideoCodec(avcodec.AV_CODEC_ID_HEVC);
         recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
         // One of the pixel formats supported by h264 nvenc
-     //   recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
+        //   recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
         recorder.setFrameRate(inputVideo.frameRate());
         recorder.setSampleRate(inputVideo.sampleRate());
         // Select the "highest" bitrate.
