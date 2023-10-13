@@ -43,6 +43,8 @@ public class Editor {
      */
     private final EnumSet<EditingFlag> editingFlags;
 
+    private final List<String> filters = new ArrayList<>();
+
 
     /* Editor settings */
 
@@ -54,7 +56,7 @@ public class Editor {
      * Default constructor, creates a working temp.
      */
     public Editor() {
-        this.editingFlags = EnumSet.of(EditingFlag.BEST_QUALITY, EditingFlag.WRITE_HDR_OPTIONS, EditingFlag.FADE_OUT_VIDEO);
+        this.editingFlags = EnumSet.of(EditingFlag.BEST_QUALITY, EditingFlag.WRITE_HDR_OPTIONS);
     }
 
     /**
@@ -88,6 +90,7 @@ public class Editor {
                 .setOutputFile(outputFile)
                 .setFlags(editingFlags)
                 .setIntroStart(introStart)
+                .setFilters(filters)
                 .setIntroEnd(intoEnd)
                 .setTimeBetweenBeats(new ArrayDeque<>(timeBetweenBeats))
                 .setVideoTimeStamps(new ArrayList<>(timeStamps))
@@ -204,7 +207,9 @@ public class Editor {
     public void fromJson(final JsonObject root) {
         final JsonArray jsonStamps = root.getAsJsonArray("time_stamps");
         final JsonArray jsonBeats = root.getAsJsonArray("beat_times");
+        final JsonArray jsonFilters = root.getAsJsonArray("filters");
 
+        jsonFilters.forEach(jsonElement -> filters.add(jsonElement.getAsString()));
         jsonStamps.forEach(jsonElement -> timeStamps.add(jsonElement.getAsLong()));
         jsonBeats.forEach(jsonElement -> timeBetweenBeats.add(jsonElement.getAsDouble()));
 
