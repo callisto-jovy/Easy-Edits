@@ -19,5 +19,12 @@ public class FlutterWrapper {
         videoEditor.writeSegments();
     }
 
+    public static void edit(final String json) {
+        final VideoEditor videoEditor = new VideoEditorBuilder()
+                .fromJson(json);
+
+        videoEditor.edit(false);
+    }
+
 
 }
