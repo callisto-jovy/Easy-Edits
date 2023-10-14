@@ -9,4 +9,6 @@ module Easy.Edits {
     requires java.desktop;
     requires com.google.gson;
     requires org.bytedeco.javacv;
+    requires org.bytedeco.ffmpeg;
+    requires org.apache.commons.io;
 }
