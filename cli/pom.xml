@@ -10,7 +10,6 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <groupId>de.yugata</groupId>
     <artifactId>cli</artifactId>
 
     <properties>
@@ -39,6 +38,7 @@
             <artifactId>spring-boot-maven-plugin</artifactId>
             <version>3.1.4</version>
         </dependency>
+
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
@@ -48,7 +48,7 @@
 
 
         <dependency>
-            <groupId>de.yugata</groupId>
+            <groupId>de.yugata.editor</groupId>
             <artifactId>core</artifactId>
             <version>1.0-SNAPSHOT</version>
             <scope>compile</scope>
@@ -76,7 +76,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>de.yugata.editor.EditorApp</mainClass>
+                    <mainClass>de.yugata.easy.edits.EditorApp</mainClass>
                 </configuration>
                 <executions>
                     <execution>
@@ -105,7 +105,7 @@
                     <archive>
                         <manifest>
                             <mainClass>
-                                de.yugata.editor.EditorApp
+                                de.yugata.easy.edits.EditorApp
                             </mainClass>
                         </manifest>
                     </archive>

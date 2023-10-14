@@ -81,7 +81,7 @@ public class VideoEditorBuilder {
         final JsonArray filters = editorState.getAsJsonArray("filters");
         final JsonArray beatTimes = editorState.getAsJsonArray("beat_times");
         final JsonArray timeStamps = editorState.getAsJsonArray("time_stamps");
-        final JsonArray editingFlags = editorState.getAsJsonArray("editing_flags");
+        final JsonObject editingFlags = editorState.getAsJsonObject("editing_flags");
 
 
         final List<FilterWrapper> mappedFilters = new ArrayList<>();
@@ -101,8 +101,10 @@ public class VideoEditorBuilder {
         beatTimes.forEach(jsonElement -> mappedBeatTimes.add(jsonElement.getAsDouble()));
 
         final EnumSet<EditingFlag> mappedEditingFlags = EnumSet.noneOf(EditingFlag.class);
-        editingFlags.forEach(jsonElement -> mappedEditingFlags.add(EditingFlag.valueOf(jsonElement.getAsString())));
-
+        editingFlags.asMap().forEach((key, value) -> {
+            if (value.getAsBoolean())
+                mappedEditingFlags.add(EditingFlag.valueOf(key));
+        });
 
         final String sourceVideo = root.get("source_video").getAsString();
         final String sourceAudio = root.get("source_audio").getAsString();
