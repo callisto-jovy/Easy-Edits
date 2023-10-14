@@ -25,7 +25,7 @@ public class VideoEditor {
     /**
      * The Framegrabber which grabs the input video
      */
-    private FFmpegFrameGrabber frameGrabber;
+    private FFmpegFrameGrabber videoGrabber;
 
     /**
      * The video's input path
@@ -37,7 +37,8 @@ public class VideoEditor {
      */
     private final String audioPath;
 
-    private long introStart, introEnd;
+    private final long introStart;
+    private final long introEnd;
 
     private final EnumSet<EditingFlag> editingFlags;
 
@@ -81,139 +82,136 @@ public class VideoEditor {
 
 
     private void initFrameGrabber() {
-        if (frameGrabber == null) {
+        if (videoGrabber == null) {
             try {
-                this.frameGrabber = new FFmpegFrameGrabber(videoPath);
-                FFmpegUtil.configureGrabber(frameGrabber);
+                this.videoGrabber = new FFmpegFrameGrabber(videoPath);
+                FFmpegUtil.configureGrabber(videoGrabber);
 
-                frameGrabber.setVideoCodecName("hevc_cuvid");
-                frameGrabber.start();
+                videoGrabber.setVideoCodecName("hevc_cuvid");
+                videoGrabber.start();
 
             } catch (FFmpegFrameGrabber.Exception e) {
                 throw new RuntimeException(e);
             }
         } else {
             try {
-                frameGrabber.start();
+                videoGrabber.start();
             } catch (FFmpegFrameGrabber.Exception e) {
                 throw new RuntimeException(e);
             }
         }
     }
 
-
     private void releaseFrameGrabber() {
-        if (frameGrabber != null) {
+        if (videoGrabber != null) {
             try {
-                frameGrabber.close();
-                this.frameGrabber = null;
+                videoGrabber.close();
+                this.videoGrabber = null;
             } catch (FrameGrabber.Exception e) {
                 throw new RuntimeException(e);
             }
         }
     }
 
-
-    public void edit(final boolean useSegments) {
-        // Write the segment files that will be stitched together.
-        final List<File> segments;
-
+    private List<File> collectSegments(final boolean useSegments) {
         if (useSegments) {
-            initFrameGrabber();
-            releaseFrameGrabber();
-
-            segments = Arrays.stream(workingDirectory.listFiles())
+            return Arrays.stream(workingDirectory.listFiles())
                     .sorted(Comparator.comparingInt(value -> Integer.parseInt(value.getName().substring("segment ".length(), value.getName().lastIndexOf(".")))))
                     .collect(Collectors.toList());
 
         } else {
-            segments = writeSegments();
+            return writeSegments();
         }
+    }
 
+
+    public void edit(final boolean useSegments) {
+        // Write the segment files that will be stitched together.
+        final List<File> segments = collectSegments(useSegments);
 
         this.initFrameGrabber();
 
         // Recorder for the final product & audio grabber to overlay the audio
         try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath);
-             final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(outputFile, editingFlags, frameGrabber)) {
-            //   recorder.setPixelFormat(inputVideo.);
-            // recorder.setPixelFormat(frameGrabber.getPixelFormat());
-            recorder.start();
+             final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(outputFile, editingFlags, videoGrabber)) {
 
             // Start grabbing the audio, we need this for the sample rate.
             audioGrabber.start();
+            recorder.start();
 
-            // Add the intro in front
+
+            /* Add the intro in front */
 
             if (introStart != -1 && introEnd != -1) {
-                this.frameGrabber.setTimestamp(introStart);
+                this.videoGrabber.setTimestamp(introStart);
 
                 Frame introFrame;
-                while ((introFrame = frameGrabber.grab()) != null && frameGrabber.getTimestamp() < introEnd) {
+                while ((introFrame = videoGrabber.grab()) != null && videoGrabber.getTimestamp() < introEnd) {
                     recorder.record(introFrame);
                 }
             }
+
+            /* End intro */
 
 
             // Edit: I fucking hate this, we just pass the frame grabber in the fucking future...
             final EditInfo editInfo = new EditInfoBuilder()
                     .setEditTime(audioGrabber.getLengthInTime())
                     .setAudioCodec(audioGrabber.getAudioCodec())
-                    .setAspectRatio(frameGrabber.getAspectRatio())
+                    .setAspectRatio(videoGrabber.getAspectRatio())
                     .setAudioChannels(audioGrabber.getAudioChannels())
                     .setAudioBitrate(audioGrabber.getAudioBitrate())
                     .setAudioMetadata(audioGrabber.getAudioMetadata())
                     .setAudioOptions(audioGrabber.getAudioOptions())
-                    .setBpp(frameGrabber.getBitsPerPixel())
-                    .setDeinterlace(frameGrabber.isDeinterlace())
+                    .setBpp(videoGrabber.getBitsPerPixel())
+                    .setDeinterlace(videoGrabber.isDeinterlace())
                     .setAudioSideData(audioGrabber.getAudioSideData())
-                    .setFrameRate(frameGrabber.getFrameRate())
-                    .setGamma(frameGrabber.getGamma())
-                    .setImageHeight(frameGrabber.getImageHeight())
-                    .setImageWidth(frameGrabber.getImageWidth())
+                    .setFrameRate(videoGrabber.getFrameRate())
+                    .setGamma(videoGrabber.getGamma())
+                    .setImageHeight(videoGrabber.getImageHeight())
+                    .setImageWidth(videoGrabber.getImageWidth())
                     .setAudioCodecName(audioGrabber.getAudioCodecName())
-                    .setMetadata(frameGrabber.getMetadata())
-                    .setOptions(frameGrabber.getOptions())
+                    .setMetadata(videoGrabber.getMetadata())
+                    .setOptions(videoGrabber.getOptions())
                     .setSampleFormat(audioGrabber.getSampleFormat())
-                    .setVideoBitrate(frameGrabber.getVideoBitrate())
-                    .setImageScalingFlags(frameGrabber.getImageScalingFlags())
+                    .setVideoBitrate(videoGrabber.getVideoBitrate())
+                    .setImageScalingFlags(videoGrabber.getImageScalingFlags())
                     .setSampleRate(audioGrabber.getSampleRate())
-                    .setVideoCodec(frameGrabber.getVideoCodec())
-                    .setVideoCodecName(frameGrabber.getVideoCodecName())
-                    .setVideoMetadata(frameGrabber.getVideoMetadata())
-                    .setVideoOptions(frameGrabber.getVideoOptions())
-                    .setVideoSideData(frameGrabber.getVideoSideData())
+                    .setVideoCodec(videoGrabber.getVideoCodec())
+                    .setVideoCodecName(videoGrabber.getVideoCodecName())
+                    .setVideoMetadata(videoGrabber.getVideoMetadata())
+                    .setVideoOptions(videoGrabber.getVideoOptions())
+                    .setVideoSideData(videoGrabber.getVideoSideData())
                     .setPixelFormat(recorder.getPixelFormat())
                     .setIntroStart(introStart)
                     .setIntroEnd(introEnd)
                     .createEditInfo();
 
 
-
-            /* Configuring the video filters */
-
+            // Configure the simple video filters.
             final FFmpegFrameFilter simpleVideoFiler = this.populateVideoFilters(editInfo);
 
+            /* Writing the segments to the main file, apply filters */
+
             for (final File segment : segments) {
+                // TODO: Move to util maybe
                 final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(segment);
                 FFmpegUtil.configureGrabber(segmentGrabber);
-                segmentGrabber.setVideoCodecName("hevc_cuvid");
-                segmentGrabber.setPixelFormat(recorder.getPixelFormat());
+                segmentGrabber.setVideoCodecName("hevc_cuvid"); // HW-Accelerated grabbing
+                segmentGrabber.setPixelFormat(recorder.getPixelFormat()); // Ensure that the pixel format is right.
                 segmentGrabber.start();
 
-
+                // Populate the transition filters, we have to reconfigure them every time, as the offsets depend on it.
                 final FFmpegFrameFilter transitionFilter = populateTransitionFilters(editInfo);
 
+                // Add the filters to a chain.
+                // TODO: Add to a ffmpeg chain?? Join the filters with a semicolon
                 final FFmpegFrameFilter[] filters;
 
                 if (simpleVideoFiler == null) {
                     filters = new FFmpegFrameFilter[]{};
                 } else {
-                    if (transitionFilter == null) {
-                        filters = new FFmpegFrameFilter[]{simpleVideoFiler};
-                    } else {
-                        filters = new FFmpegFrameFilter[]{transitionFilter, simpleVideoFiler};
-                    }
+                    filters = transitionFilter == null ? new FFmpegFrameFilter[]{simpleVideoFiler} : new FFmpegFrameFilter[]{transitionFilter, simpleVideoFiler};
                 }
 
                 // grab the frames & send them to the filters
@@ -222,6 +220,7 @@ public class VideoEditor {
                     FFmpegUtil.pushToFilters(videoFrame, recorder, filters);
                 }
 
+                // Close the transition filter, free the resources
                 if (transitionFilter != null)
                     transitionFilter.close();
 
@@ -229,16 +228,18 @@ public class VideoEditor {
                 segmentGrabber.close();
             }
 
+            /* End recording video */
+
             /* Clean up resources */
             if (simpleVideoFiler != null)
                 simpleVideoFiler.stop();
 
-
+            // Record the audio
             this.recordAudio(audioGrabber, recorder, editInfo);
+            ///////////////
         } catch (FrameRecorder.Exception | FrameGrabber.Exception | FrameFilter.Exception e) {
             throw new RuntimeException(e);
         }
-
         this.releaseFrameGrabber();
     }
 
@@ -284,7 +285,7 @@ public class VideoEditor {
 
 
         // The videos framerate
-        final double frameRate = frameGrabber.getFrameRate();
+        final double frameRate = videoGrabber.getFrameRate();
         // The time one frame takes in ms.
         final double frameTime = 1000 / frameRate;
 
@@ -306,13 +307,13 @@ public class VideoEditor {
 
                 if (nextStamp < videoTimeStamps.size()) {
                     final double timeStamp = videoTimeStamps.get(nextStamp);
-                    frameGrabber.setTimestamp((long) timeStamp);
+                    videoGrabber.setTimestamp((long) timeStamp);
                 }
 
                 // Write a new segment to disk
                 final File segmentFile = new File(workingDirectory, String.format("segment %d.mp4", nextStamp));
                 segmentFiles.add(segmentFile); // Add the file to the segments.
-                final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(segmentFile, editingFlags, frameGrabber);
+                final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(segmentFile, editingFlags, videoGrabber);
                 //        recorder.setPixelFormat(frameGrabber.getPixelFormat());
                 //    recorder.setPixelFormat(frameGrabber.getPixelFormat());
                 //   recorder.setVideoCodec(AV_CODEC_ID_H265);
@@ -325,7 +326,7 @@ public class VideoEditor {
 
                 // Pick frames till the interim is filled...
                 Frame frame;
-                while ((frame = frameGrabber.grabImage()) != null && localMs < timeBetween) {
+                while ((frame = videoGrabber.grabImage()) != null && localMs < timeBetween) {
 
                     recorder.record(frame);
                     localMs += frameTime;
@@ -394,7 +395,6 @@ public class VideoEditor {
         if (combinedFilters.length() == 0)
             return null;
 
-        System.out.println(combinedFilters);
         final FFmpegFrameFilter audioFilter = new FFmpegFrameFilter(combinedFilters.toString(), 2);
         audioFilter.start();
 
@@ -427,7 +427,6 @@ public class VideoEditor {
         if (combinedFilters.length() == 0)
             return null;
 
-        System.out.println(combinedFilters);
         final FFmpegFrameFilter videoFilter = new FFmpegFrameFilter(combinedFilters.toString(), editInfo.getImageWidth(), editInfo.getImageHeight());
         videoFilter.setPixelFormat(editInfo.getPixelFormat());
         videoFilter.setFrameRate(editInfo.getFrameRate());
