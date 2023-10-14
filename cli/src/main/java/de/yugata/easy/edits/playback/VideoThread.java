@@ -1,8 +1,8 @@
 package de.yugata.easy.edits.playback;
 
-import de.yugata.editor.editor.Editor;
-import de.yugata.editor.model.CLIArgs;
-import de.yugata.editor.util.FFmpegUtil;
+import de.yugata.easy.edits.editor.Editor;
+import de.yugata.easy.edits.model.CLIArgs;
+import de.yugata.easy.edits.util.FFmpegUtil;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.FrameGrabber;

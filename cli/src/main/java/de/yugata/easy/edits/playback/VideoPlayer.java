@@ -1,6 +1,6 @@
 package de.yugata.easy.edits.playback;
 
-import de.yugata.editor.editor.Editor;
+import de.yugata.easy.edits.editor.Editor;
 import org.bytedeco.javacv.Frame;
 
 import java.awt.event.KeyEvent;
