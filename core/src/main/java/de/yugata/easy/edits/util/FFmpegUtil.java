@@ -17,39 +17,51 @@ import java.util.EnumSet;
  */
 public class FFmpegUtil {
 
+    public static final File RESOURCE_DIRECTORY = new File("editor_resources");
+
+    static {
+        if (!RESOURCE_DIRECTORY.exists()) {
+            RESOURCE_DIRECTORY.mkdir();
+        }
+    }
 
     //TODO: Multiple fonts??
     public static String getFontFile() {
         // Download the font file to the temp.
-        File dalton = new File("dalton.otf");
+        File dalton = new File(RESOURCE_DIRECTORY, "dalton.otf");
 
         try {
             if (!dalton.exists())
                 FileUtils.copyURLToFile(new URL("https://github.com/callisto-jovy/Fast-Edits/releases/download/external/Dalton.otf"), dalton);
         } catch (IOException e) {
-            dalton = new File("C:/Windows/Fonts/Arial.ttf");
             e.printStackTrace();
+            return cleanPath("C:/Windows/Fonts/Arial.ttf");
         }
 
-
         // Our font file is in the resources, but ffmpeg needs an absolute path
-        return dalton.getAbsolutePath()
+        return cleanPath(dalton.getAbsolutePath());
+    }
+
+    public static String cleanPath(final String filePath) {
+        return filePath
                 .replace('\\', '/')
                 .replace(":", "\\:");
     }
 
     public static void pushToFilters(final Frame frame, final FFmpegFrameRecorder recorder, final FFmpegFrameFilter... filters) {
         try {
+            // just record if no filters are in the chain.
             if (filters.length == 0) {
                 recorder.record(frame);
                 return;
             }
 
-
             // Feed the frame to the first filter
             filters[0].push(frame);
-            //
+
+            // Loop through the following filters.
             for (int i = 1; i < filters.length; i++) {
+
                 // Pull frames from predecessor
                 final FFmpegFrameFilter predecessor = filters[i - 1];
                 Frame processedFrame;
@@ -58,9 +70,10 @@ public class FFmpegUtil {
                     filters[i].push(processedFrame, predecessor.getPixelFormat());
                 }
             }
-            // Grab the frames from the last filter...
 
+            // Grab the frames from the last filter...
             final FFmpegFrameFilter finalFilter = filters[filters.length - 1];
+            // Push the frames that moved through the entire filter chain to the recorder
             Frame processedFrame;
             while ((processedFrame = finalFilter.pull()) != null) {
                 recorder.record(processedFrame, finalFilter.getPixelFormat());
