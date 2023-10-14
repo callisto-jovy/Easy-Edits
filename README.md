@@ -1,7 +1,7 @@
 # Easy-Edits
 
 A CLI-application / library which allows for easy montage editing to a given audio source. 
-This repository includes the core library as well as the CLI built on top. For a user-friendly UI-implementaion see ![Fast-Edits-UI](https://github.com/callisto-jovy/Easy-Edits-UI) which uses the library under the hood. 
+This repository includes the core library as well as the CLI built on top. For a user-friendly UI-Implementation, see ![Fast-Edits-UI](https://github.com/callisto-jovy/Easy-Edits-UI) which uses the library under the hood. 
 
 
 ## How it works
