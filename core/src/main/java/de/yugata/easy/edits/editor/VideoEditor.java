@@ -75,7 +75,7 @@ public class VideoEditor {
             workingDirectory.mkdir();
 
         if (outputFile.exists()) {
-            this.outputFile = new File(outputFile.getParent(), UUID.randomUUID() + outputFile.getName());
+            this.outputFile = new File(workingDirectory.getParent(), UUID.randomUUID() + outputFile.getName());
         } else {
             this.outputFile = outputFile;
         }
@@ -435,6 +435,7 @@ public class VideoEditor {
                 combinedFilters.append(",");
             }
         }
+
 
         if (combinedFilters.length() == 0)
             return null;
