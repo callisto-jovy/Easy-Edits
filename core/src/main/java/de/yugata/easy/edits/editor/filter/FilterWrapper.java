@@ -1,30 +1,32 @@
 package de.yugata.easy.edits.editor.filter;
 
+import java.util.List;
+
 public class FilterWrapper {
 
     private final String name;
-    private final String value;
+
+    private final String description;
+
+    private final List<FilterValue> values;
 
 
-    public FilterWrapper(String name, String value) {
+    public FilterWrapper(String name, String description, List<FilterValue> values) {
         this.name = name;
-        this.value = value;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj instanceof FilterWrapper && ((FilterWrapper) obj).getName().equals(name);
-    }
-
-    public boolean nameEquals(final String name) {
-        return this.name.equals(name);
+        this.description = description;
+        this.values = values;
     }
 
     public String getName() {
         return name;
     }
 
-    public String getValue() {
-        return value;
+
+    public String getDescription() {
+        return description;
+    }
+
+    public List<FilterValue> getValues() {
+        return values;
     }
 }

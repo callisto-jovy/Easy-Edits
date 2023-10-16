@@ -1,0 +1,14 @@
+{
+  "name": "interpolate_video_frames",
+  "display_name": "Interpolate frames",
+  "description": "Fades to black after one clip for a certain amount of milliseconds.",
+  "type": "TRANSITION",
+  "command": "fade=t=in:st=0us:d=$fadeDuration$",
+  "settings": [
+    {
+      "name": "fadeDuration",
+      "default": "200",
+      "type": "VALUE"
+    }
+  ]
+}

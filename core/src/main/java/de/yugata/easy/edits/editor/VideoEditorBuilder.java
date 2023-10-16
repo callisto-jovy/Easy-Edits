@@ -3,6 +3,7 @@ package de.yugata.easy.edits.editor;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import de.yugata.easy.edits.editor.filter.FilterValue;
 import de.yugata.easy.edits.editor.filter.FilterWrapper;
 
 import java.io.File;
@@ -88,9 +89,14 @@ public class VideoEditorBuilder {
         filters.forEach(jsonElement -> {
             final JsonObject object = jsonElement.getAsJsonObject();
             final String name = object.get("name").getAsString();
-            final String value = object.get("value").getAsString();
+            final JsonArray value = object.get("values").getAsJsonArray();
 
-            final FilterWrapper wrapper = new FilterWrapper(name, value);
+            final List<FilterValue> values = new ArrayList<>();
+            // Map the json values to filter values
+            //TODO: Clean up this mess..
+            value.forEach(jsonElement1 -> values.add(new FilterValue(jsonElement1.getAsJsonObject().get("name").getAsString(), jsonElement1.getAsJsonObject().get("value").getAsString())));
+
+            final FilterWrapper wrapper = new FilterWrapper(name, "", values);
             mappedFilters.add(wrapper);
         });
 
