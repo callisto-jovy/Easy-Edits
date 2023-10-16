@@ -1,0 +1,20 @@
+{
+  "name": "fade_audio_out",
+  "display_name": "Fade video out to black",
+  "description": "Fades the edit to black at the end and displays a watermark.",
+  "type": "AUDIO",
+  "command": "afade=t=out:st=$fadeStart$:d=$fadeDuration$",
+  "settings": [
+    {
+      "name": "fadeStart",
+      "type": "VARIABLE",
+      "mapped": "edit_time",
+      "offset": "-4"
+    },
+    {
+      "name": "fadeDuration",
+      "default": "4",
+      "type": "VALUE"
+    }
+  ]
+}

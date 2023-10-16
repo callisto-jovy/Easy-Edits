@@ -1,7 +1,9 @@
 package de.yugata.easy.edits.editor;
 
 
-import de.yugata.easy.edits.editor.filter.*;
+import de.yugata.easy.edits.editor.filter.Filter;
+import de.yugata.easy.edits.editor.filter.FilterManager;
+import de.yugata.easy.edits.editor.filter.FilterWrapper;
 import de.yugata.easy.edits.util.FFmpegUtil;
 import org.bytedeco.javacv.*;
 
@@ -56,7 +58,7 @@ public class VideoEditor {
                        final List<FilterWrapper> filters,
                        final long introStart,
                        final long introEnd,
-                       File workingDirectory) {
+                       final File workingDirectory) {
 
         this.videoPath = videoPath;
         this.audioPath = audioPath;
@@ -68,11 +70,16 @@ public class VideoEditor {
         this.filters = filters;
         this.workingDirectory = workingDirectory;
 
+
+        if (!workingDirectory.exists())
+            workingDirectory.mkdir();
+
         if (outputFile.exists()) {
             this.outputFile = new File(outputFile.getParent(), UUID.randomUUID() + outputFile.getName());
         } else {
             this.outputFile = outputFile;
         }
+
 
         if (flags.contains(EditingFlag.PRINT_DEBUG)) {
             FFmpegLogCallback.set();
@@ -188,6 +195,10 @@ public class VideoEditor {
                     .createEditInfo();
 
 
+            // Populate the filters
+            FilterManager.FILTER_MANAGER.populateFilters(filters, editInfo);
+
+
             // Configure the simple video filters.
             final FFmpegFrameFilter simpleVideoFiler = this.populateVideoFilters(editInfo);
 
@@ -235,7 +246,7 @@ public class VideoEditor {
                 simpleVideoFiler.stop();
 
             // Record the audio
-            this.recordAudio(audioGrabber, recorder, editInfo);
+            this.recordAudio(audioGrabber, recorder);
             ///////////////
         } catch (FrameRecorder.Exception | FrameGrabber.Exception | FrameFilter.Exception e) {
             throw new RuntimeException(e);
@@ -243,8 +254,8 @@ public class VideoEditor {
         this.releaseFrameGrabber();
     }
 
-    private void recordAudio(final FFmpegFrameGrabber audioGrabber, final FFmpegFrameRecorder recorder, final EditInfo editInfo) throws FFmpegFrameFilter.Exception, FFmpegFrameGrabber.Exception, FFmpegFrameRecorder.Exception {
-        final FFmpegFrameFilter simpleAudioFiler = this.populateAudioFilters(editInfo);
+    private void recordAudio(final FFmpegFrameGrabber audioGrabber, final FFmpegFrameRecorder recorder) throws FFmpegFrameFilter.Exception, FFmpegFrameGrabber.Exception, FFmpegFrameRecorder.Exception {
+        final FFmpegFrameFilter simpleAudioFiler = this.populateAudioFilters();
 
         /* Audio frame grabbing */
         Frame audioFrame;
@@ -351,10 +362,10 @@ public class VideoEditor {
     private FFmpegFrameFilter populateTransitionFilters(EditInfo editInfo) throws FFmpegFrameFilter.Exception {
         final StringBuilder combinedFilters = new StringBuilder();
 
-        final List<TransitionVideoFilter> transitions = FilterManager.FILTER_MANAGER.getTransitions(filters, editInfo);
+        final List<Filter> transitions = FilterManager.FILTER_MANAGER.getTransitions();
 
         for (int i = 0; i < transitions.size(); i++) {
-            final TransitionVideoFilter transition = transitions.get(i);
+            final Filter transition = transitions.get(i);
 
             combinedFilters
                     .append(transition.getFilter());
@@ -377,12 +388,13 @@ public class VideoEditor {
     }
 
 
-    private FFmpegFrameFilter populateAudioFilters(EditInfo editInfo) throws FFmpegFrameFilter.Exception {
+    private FFmpegFrameFilter populateAudioFilters() throws FFmpegFrameFilter.Exception {
         final StringBuilder combinedFilters = new StringBuilder();
 
-        final List<SimpleAudioFilter> audioFilters = FilterManager.FILTER_MANAGER.getAudioFilters(filters, editInfo);
+        final List<Filter> audioFilters = FilterManager.FILTER_MANAGER.getAudioFilters();
+
         for (int i = 0; i < audioFilters.size(); i++) {
-            final SimpleAudioFilter audioFilter = audioFilters.get(i);
+            final Filter audioFilter = audioFilters.get(i);
 
             combinedFilters
                     .append(audioFilter.getFilter());
@@ -411,10 +423,10 @@ public class VideoEditor {
     private FFmpegFrameFilter populateVideoFilters(final EditInfo editInfo) throws FFmpegFrameFilter.Exception {
         final StringBuilder combinedFilters = new StringBuilder();
 
-        final List<SimpleVideoFilter> videoFilters = FilterManager.FILTER_MANAGER.getVideoFilters(filters, editInfo);
+        final List<Filter> videoFilters = FilterManager.FILTER_MANAGER.getVideoFilters();
 
         for (int i = 0; i < videoFilters.size(); i++) {
-            final SimpleVideoFilter videoFilter = videoFilters.get(i);
+            final Filter videoFilter = videoFilters.get(i);
 
             combinedFilters
                     .append(videoFilter.getFilter());

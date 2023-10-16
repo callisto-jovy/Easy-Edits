@@ -1,133 +1,120 @@
 package de.yugata.easy.edits.editor.filter;
 
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import de.yugata.easy.edits.editor.EditInfo;
-import de.yugata.easy.edits.editor.filter.filters.*;
+import de.yugata.easy.edits.util.FilterParser;
 
-import java.lang.reflect.InvocationTargetException;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Consumer;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public class FilterManager {
 
 
+    private static final File FILTER_DIR = new File("filters");
+
     public static final FilterManager FILTER_MANAGER = new FilterManager();
 
 
-    private final Map<String, Class<?>> filters = new HashMap<>();
-    private final Map<String, String> filterValueMap = new HashMap<>();
+    private final List<Filter> filters = new ArrayList<>();
+
+    private final List<FilterWrapper> availableFilters = new ArrayList<>();
 
 
     public FilterManager() {
-        this.populateFilters();
+        this.populateAvailableFilters();
     }
 
+    private void populateAvailableFilters() {
+        if (!checkFilterAvailability())
+            return;
 
-    public void populateFilters() {
-        final Class<?>[] classes = {
-                FadeInAudio.class,
-                FadeOutAudio.class,
-                FadeOutVideo.class,
-                InterpolateFilter.class,
-                ZoomInFilter.class,
-                FadeToBlackTransition.class,
-                FadeIntroAudio.class,
-        };
+        final File[] files = FILTER_DIR.listFiles();
 
-        for (final Class<?> aClass : classes) {
-            final FilterInfo filterInfo = aClass.getAnnotation(FilterInfo.class);
-            if (filterInfo == null) {
-                System.err.println("Warning: No annotation found for class: " + aClass);
-                continue;
+        for (final File file : files) {
+            try {
+                final JsonElement root = JsonParser.parseReader(new FileReader(file));
+                final FilterWrapper wrapper = FilterParser.getFilterWrapper(root);
+
+                availableFilters.add(wrapper);
+
+            } catch (IOException e) {
+                System.err.println("Could not read filter. IO-Exception thrown.");
+            } catch (Exception e) {
+                System.err.println("Error while parsing filter: " + e.getMessage());
             }
-            filterValueMap.put(filterInfo.name(), filterInfo.value());
-            filters.put(filterInfo.name(), aClass);
         }
-    }
 
-    private boolean filtersContains(final List<FilterWrapper> filterWrappers, final String name) {
-        return filterWrappers.stream().anyMatch(filterWrapper -> filterWrapper.nameEquals(name));
-    }
-
-    public List<TransitionVideoFilter> getTransitions(final List<FilterWrapper> filters, final EditInfo editInfo) {
-        final List<TransitionVideoFilter> filterList = new ArrayList<>();
-
-        filterForType(FilterType.TRANSITION, aClass -> {
-
-            try {
-                final TransitionVideoFilter transitionVideoFilter = (TransitionVideoFilter) aClass
-                        .getDeclaredConstructor(EditInfo.class)
-                        .newInstance(editInfo);
-
-                if (filtersContains(filters, transitionVideoFilter.getName()))
-                    filterList.add(transitionVideoFilter);
-
-            } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
-                     NoSuchMethodException e) {
-                e.printStackTrace();
-            }
-        });
-        return filterList;
     }
 
 
-    public List<SimpleVideoFilter> getVideoFilters(final List<FilterWrapper> filters, final EditInfo editInfo) {
-        final List<SimpleVideoFilter> filterList = new ArrayList<>();
+    public void populateFilters(final List<FilterWrapper> filterWrappers, final EditInfo editInfo) {
+        if (!checkFilterAvailability())
+            return;
 
-        filterForType(FilterType.VIDEO, aClass -> {
+        final File[] files = FILTER_DIR.listFiles();
 
-            try {
-                final SimpleVideoFilter simpleVideoFilter = (SimpleVideoFilter) aClass
-                        .getDeclaredConstructor(EditInfo.class)
-                        .newInstance(editInfo);
+        final FilterParser filterParser = new FilterParser(editInfo);
 
-                if (filtersContains(filters, simpleVideoFilter.getName()))
-                    filterList.add(simpleVideoFilter);
+        for (final FilterWrapper filterWrapper : filterWrappers) {
+            // get the filter that matches the name (id)
 
-            } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
-                     NoSuchMethodException e) {
-                e.printStackTrace();
-            }
-        });
-        return filterList;
-    }
+            for (final File file : files) {
+                try {
+                    final JsonElement root = JsonParser.parseReader(new FileReader(file));
 
-    public List<SimpleAudioFilter> getAudioFilters(final List<FilterWrapper> filters, final EditInfo editInfo) {
-        final List<SimpleAudioFilter> filterList = new ArrayList<>();
-
-        filterForType(FilterType.AUDIO, aClass -> {
-
-            try {
-                final SimpleAudioFilter simpleAudioFilter = (SimpleAudioFilter) aClass
-                        .getDeclaredConstructor(EditInfo.class)
-                        .newInstance(editInfo);
-
-                if (filtersContains(filters, simpleAudioFilter.getName()))
-                    filterList.add(simpleAudioFilter);
-
-            } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
-                     NoSuchMethodException e) {
-                e.printStackTrace();
-            }
-        });
-        return filterList;
-    }
+                    if (filterParser.doesIdMatch(filterWrapper.getName(), root)) {
+                        final Filter filter = filterParser.parseFilter(filterWrapper, root);
+                        filters.add(filter);
+                    }
 
 
-    private void filterForType(final FilterType type, final Consumer<Class<?>> classConsumer) {
-        for (final Map.Entry<String, Class<?>> stringClassEntry : filters.entrySet()) {
-            final FilterInfo filterInfo = stringClassEntry.getValue().getAnnotation(FilterInfo.class);
-
-            if (filterInfo.filterType() == type) {
-                classConsumer.accept(stringClassEntry.getValue());
+                } catch (IOException e) {
+                    System.err.println("Could not read filter. IO-Exception thrown.");
+                } catch (Exception e) {
+                    System.err.println("Error while parsing filter: " + e.getMessage());
+                }
             }
         }
     }
 
-    public Map<String, String> getFilterValueMap() {
-        return filterValueMap;
+    private boolean checkFilterAvailability() {
+        // load the filters from the resources
+
+        if (!FILTER_DIR.exists()) {
+            System.err.println("No filter directory exists at the required position. No filters were loaded.");
+            return false;
+        }
+
+        final File[] files = FILTER_DIR.listFiles();
+        if (files == null) {
+            System.err.println("No files found in the filter directory. No filters were loaded.");
+            return false;
+        }
+        return true;
+    }
+
+    public List<Filter> getTransitions() {
+        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.TRANSITION).collect(Collectors.toList());
+    }
+
+
+    public List<Filter> getVideoFilters() {
+        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.VIDEO).collect(Collectors.toList());
+
+    }
+
+    public List<Filter> getAudioFilters() {
+        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.AUDIO).collect(Collectors.toList());
+    }
+
+    public List<FilterWrapper> getAvailableFilters() {
+        return availableFilters;
     }
 }

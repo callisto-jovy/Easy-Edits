@@ -1,21 +1,33 @@
 package de.yugata.easy.edits.editor.filter;
 
-import org.bytedeco.javacv.FFmpegFrameFilter;
-import org.bytedeco.javacv.Frame;
-
-import java.util.function.Consumer;
-
-public interface Filter {
+public class Filter {
 
 
-    void startFilter() throws FFmpegFrameFilter.Exception;
+    private final String name, description, filter;
 
-    void stopFilter() throws FFmpegFrameFilter.Exception;
+    private final FilterType filterType;
 
-    void pushToFilter(final Frame frame, final Consumer<Frame> frameConsumer) throws FFmpegFrameFilter.Exception;
 
-    void push(final Frame frame) throws FFmpegFrameFilter.Exception;
+    public Filter(String name, String description, String filter, FilterType filterType) {
+        this.name = name;
+        this.description = description;
+        this.filter = filter;
+        this.filterType = filterType;
+    }
 
-    Frame pull() throws FFmpegFrameFilter.Exception;
+    public FilterType getFilterType() {
+        return filterType;
+    }
 
+    public String getName() {
+        return name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public String getFilter() {
+        return filter;
+    }
 }
