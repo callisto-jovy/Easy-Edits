@@ -1,12 +1,12 @@
 {
   "name": "fade_black_transition",
   "display_name": "Fade to black transition",
-  "description": "Uses interpolation to create an motion blur effect & increase the framerate by predicting what frames between might look like.",
+  "description": "Fades in from black after every cut. The time to fade in is in milliseconds.",
   "type": "VIDEO",
-  "command": "minterpolate=fps=$fps$,tblend=all_mode=average,setpts=%d*PTS",
+  "command": "fade=t=in:st=0:d=$fadeIn$ms",
   "settings": [
     {
-      "name": "fps",
+      "name": "$fadeIn$",
       "default": "120",
       "type": "VALUE"
     }

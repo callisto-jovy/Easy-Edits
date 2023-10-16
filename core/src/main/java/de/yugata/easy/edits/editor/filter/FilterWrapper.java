@@ -10,7 +10,6 @@ public class FilterWrapper {
 
     private final List<FilterValue> values;
 
-
     public FilterWrapper(String name, String description, List<FilterValue> values) {
         this.name = name;
         this.description = description;
