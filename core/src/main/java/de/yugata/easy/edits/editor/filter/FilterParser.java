@@ -1,13 +1,10 @@
-package de.yugata.easy.edits.util;
+package de.yugata.easy.edits.editor.filter;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import de.yugata.easy.edits.editor.EditInfo;
-import de.yugata.easy.edits.editor.filter.Filter;
-import de.yugata.easy.edits.editor.filter.FilterType;
-import de.yugata.easy.edits.editor.filter.FilterValue;
-import de.yugata.easy.edits.editor.filter.FilterWrapper;
+import de.yugata.easy.edits.util.FFmpegUtil;
 import org.bytedeco.javacpp.tools.ParserException;
 
 import java.util.ArrayList;
@@ -21,7 +18,7 @@ import java.util.regex.Pattern;
 
 public class FilterParser {
 
-    private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\$([A-Za-z])+\\$");
+    private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\$([A-Za-z]+)\\$");
 
     private final EditInfo editInfo;
 
@@ -78,7 +75,6 @@ public class FilterParser {
         // grab the id (name)
         final String name = root.get("name").getAsString();
         final String displayName = root.get("display_name").getAsString();
-        final String description = root.get("description").getAsString();
         final String rawCommand = root.get("command").getAsString();
 
         final JsonArray settings = root.getAsJsonArray("settings");
@@ -115,6 +111,7 @@ public class FilterParser {
             final String type = setting.get("type").getAsString().toUpperCase();
             final TokenType tokenType = TokenType.valueOf(type);
 
+
             if (tokenType == TokenType.VARIABLE) {
                 return getVariable(setting);
             } else if (tokenType == TokenType.VALUE) {
@@ -125,6 +122,7 @@ public class FilterParser {
             // TODO: variable offsets may be set by values.
 
         }
+
         return "";
     }
 
@@ -136,7 +134,7 @@ public class FilterParser {
             if (value.variable.equalsIgnoreCase(map)) {
                 final String mapped = value.mapper.apply(editInfo);
 
-                return hasOffset ? value.offsetMapper.apply(editInfo, mapped) : mapped;
+                return hasOffset ? value.offsetMapper.apply(editInfo, variable.get("offset").getAsString()) : mapped;
             }
         }
 
@@ -154,9 +152,13 @@ public class FilterParser {
         EDIT_DURATION(
                 "edit_time",
                 editInfo -> String.valueOf(editInfo.getEditTime()),
-                (editInfo, s) -> String.valueOf(editInfo.getEditTime() - TimeUnit.SECONDS.toMicros(Long.parseLong(s)))),
-
-        ;
+                (editInfo, s) -> String.valueOf(editInfo.getEditTime() + TimeUnit.SECONDS.toMicros(Long.parseLong(s)))),
+        EDIT_DURATION_SECONDS(
+                "edit_time_s",
+                editInfo -> String.valueOf(editInfo.getEditTime() / 1000000L),
+                (editInfo, s) -> String.valueOf(editInfo.getEditTime() / 1000000L + Long.parseLong(s))
+        ),
+        FONT_FILE("font_file", editInfo -> FFmpegUtil.getFontFile(), (editInfo1, s) -> FFmpegUtil.getFontFile());
 
 
         private final String variable;
