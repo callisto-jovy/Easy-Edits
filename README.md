@@ -1,5 +1,8 @@
-# Fast-Edits
-A CLI-Application which allows for easy montage editing to a given audio source. 
+# Easy-Edits
+
+A CLI-application / library which allows for easy montage editing to a given audio source. 
+This repository includes the core library as well as the CLI built on top. For a user-friendly UI-Implementation, see ![Fast-Edits-UI](https://github.com/callisto-jovy/Easy-Edits-UI) which uses the library under the hood. 
+
 
 ## How it works
 After specifying a video and audio input, the audio may be analysed based on custom parameters. These parameters can be fine-tuned in a wave-form representation overlay. 
@@ -18,13 +21,3 @@ After the beat, the next sequence is started, & the next timestamp is used as a 
 As this program has been developed for a very short time and is an open-sourced in-house tool, so certain specifics may not work with your input.
 Reading the provided output log is helpful; video codecs might have to be changed, depending on your input.
 If you don't know what you are doing, I would advise you to a) wait for a more polished version or b) wait for a binary release. If you still feel frisky and the setup or something else does not work, feel free to open up an issue.
-
-
- ## Results
-* ![2001: A Space Odyssey](https://www.youtube.com/watch?v=2PLIkvabFRs)
-* ![No country for old men](https://www.youtube.com/watch?v=MF9RxFMAMZ4)
-* ![Blade Runner 2049](https://www.youtube.com/watch?v=kDtZDusWHGQ)
-* ![All Quiet On The Western Front](https://www.youtube.com/watch?v=20GEEztj7lA)
-* ![Drive](https://www.youtube.com/watch?v=LnX8RPeWCMs)
-* ![Bullet Train](https://www.youtube.com/watch?v=CNDXf7E-hW4)
-
