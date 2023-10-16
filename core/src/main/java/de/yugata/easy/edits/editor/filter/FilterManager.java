@@ -4,14 +4,12 @@ package de.yugata.easy.edits.editor.filter;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import de.yugata.easy.edits.editor.EditInfo;
-import de.yugata.easy.edits.util.FilterParser;
 
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class FilterManager {
@@ -55,6 +53,8 @@ public class FilterManager {
 
 
     public void populateFilters(final List<FilterWrapper> filterWrappers, final EditInfo editInfo) {
+        this.filters.clear();
+
         if (!checkFilterAvailability())
             return;
 
@@ -86,6 +86,8 @@ public class FilterManager {
 
     private boolean checkFilterAvailability() {
         // load the filters from the resources
+
+        System.out.println("Filter dir pos: " + FILTER_DIR.getAbsolutePath());
 
         if (!FILTER_DIR.exists()) {
             System.err.println("No filter directory exists at the required position. No filters were loaded.");

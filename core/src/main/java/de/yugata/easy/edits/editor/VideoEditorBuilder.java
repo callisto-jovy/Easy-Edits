@@ -89,12 +89,15 @@ public class VideoEditorBuilder {
         filters.forEach(jsonElement -> {
             final JsonObject object = jsonElement.getAsJsonObject();
             final String name = object.get("name").getAsString();
-            final JsonArray value = object.get("values").getAsJsonArray();
+            final JsonObject value = object.get("values").getAsJsonObject();
 
             final List<FilterValue> values = new ArrayList<>();
             // Map the json values to filter values
             //TODO: Clean up this mess..
-            value.forEach(jsonElement1 -> values.add(new FilterValue(jsonElement1.getAsJsonObject().get("name").getAsString(), jsonElement1.getAsJsonObject().get("value").getAsString())));
+
+            value.asMap().forEach((s, jsonElement1) -> {
+                values.add(new FilterValue(s, jsonElement1.getAsString()));
+            });
 
             final FilterWrapper wrapper = new FilterWrapper(name, "", values);
             mappedFilters.add(wrapper);
@@ -121,7 +124,7 @@ public class VideoEditorBuilder {
 
         return setVideoPath(sourceVideo)
                 .setWorkingDirectory(new File(workingPath))
-                .setOutputFile(new File(outputPath))
+                .setOutputFile(new File(workingPath, outputPath))
                 .setAudioPath(sourceAudio)
                 .setFilters(mappedFilters)
                 .setFlags(mappedEditingFlags)
