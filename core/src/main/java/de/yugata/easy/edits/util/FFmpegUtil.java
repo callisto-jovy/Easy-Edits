@@ -1,7 +1,10 @@
 package de.yugata.easy.edits.util;
 
 
+import de.yugata.easy.edits.editor.EditInfo;
 import de.yugata.easy.edits.editor.EditingFlag;
+import de.yugata.easy.edits.editor.filter.Filter;
+import de.yugata.easy.edits.editor.filter.FilterManager;
 import org.apache.commons.io.FileUtils;
 import org.bytedeco.ffmpeg.global.avcodec;
 import org.bytedeco.ffmpeg.global.avutil;
@@ -11,6 +14,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.EnumSet;
+import java.util.List;
 
 /**
  * TODO: This needs some documentation, not only for other, but also for myself.
@@ -147,4 +151,92 @@ public class FFmpegUtil {
 
         return recorder;
     }
+
+    private static String chainFilters(final List<Filter> filters) {
+        if (filters.isEmpty()) return null;
+        final StringBuilder chainedFilters = new StringBuilder();
+
+
+        // Add in to first filter...
+        chainedFilters.append("[in]");
+
+        for (int i = 0; i < filters.size(); i++) {
+            final Filter videoFilter = filters.get(i);
+
+            if (i > 0) {
+                chainedFilters
+                        .append("[f")
+                        .append((i - 1))
+                        .append("]");
+            }
+
+            chainedFilters
+                    .append(videoFilter.getFilter());
+
+            if (i < filters.size() - 1) {
+                chainedFilters
+                        .append("[f")
+                        .append(i)
+                        .append("]")
+                        .append(";");
+                // --> [f i]; so that in the next iteration this will be the input.
+            }
+        }
+
+        chainedFilters.append("[out]");
+
+        return chainedFilters.toString();
+    }
+
+
+    public static FFmpegFrameFilter populateTransitionFilters(EditInfo editInfo) throws FFmpegFrameFilter.Exception {
+        final List<Filter> filters = FilterManager.FILTER_MANAGER.getTransitions();
+
+        if (filters.isEmpty())
+            return null;
+
+        final String chained = chainFilters(filters);
+
+
+        final FFmpegFrameFilter transitionFilter = new FFmpegFrameFilter(chained, editInfo.getImageWidth(), editInfo.getImageHeight());
+        transitionFilter.setPixelFormat(editInfo.getPixelFormat());
+        transitionFilter.setFrameRate(editInfo.getFrameRate());
+        transitionFilter.start();
+
+        return transitionFilter;
+    }
+
+
+    public static FFmpegFrameFilter populateAudioFilters() throws FFmpegFrameFilter.Exception {
+        final List<Filter> filters = FilterManager.FILTER_MANAGER.getAudioFilters();
+
+        if (filters.isEmpty())
+            return null;
+
+        final String chained = chainFilters(filters);
+
+        final FFmpegFrameFilter audioFilter = new FFmpegFrameFilter(chained, 2);
+        audioFilter.start();
+
+        return audioFilter;
+    }
+
+
+    public static FFmpegFrameFilter populateVideoFilters(final EditInfo editInfo) throws FFmpegFrameFilter.Exception {
+        final List<Filter> filters = FilterManager.FILTER_MANAGER.getVideoFilters();
+
+        if (filters.isEmpty())
+            return null;
+
+        final String chained = chainFilters(filters);
+
+        final FFmpegFrameFilter videoFilter = new FFmpegFrameFilter(chained, editInfo.getImageWidth(), editInfo.getImageHeight());
+        videoFilter.setPixelFormat(editInfo.getPixelFormat());
+        videoFilter.setFrameRate(editInfo.getFrameRate());
+        videoFilter.setVideoInputs(1);
+        videoFilter.start();
+
+        return videoFilter;
+    }
+
 }
