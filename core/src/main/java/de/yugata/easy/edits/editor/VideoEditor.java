@@ -1,7 +1,6 @@
 package de.yugata.easy.edits.editor;
 
 
-import de.yugata.easy.edits.editor.filter.Filter;
 import de.yugata.easy.edits.editor.filter.FilterManager;
 import de.yugata.easy.edits.editor.filter.FilterWrapper;
 import de.yugata.easy.edits.util.FFmpegUtil;
@@ -200,7 +199,7 @@ public class VideoEditor {
 
 
             // Configure the simple video filters.
-            final FFmpegFrameFilter simpleVideoFiler = this.populateVideoFilters(editInfo);
+            final FFmpegFrameFilter simpleVideoFiler = FFmpegUtil.populateVideoFilters(editInfo);
 
             /* Writing the segments to the main file, apply filters */
 
@@ -213,7 +212,7 @@ public class VideoEditor {
                 segmentGrabber.start();
 
                 // Populate the transition filters, we have to reconfigure them every time, as the offsets depend on it.
-                final FFmpegFrameFilter transitionFilter = populateTransitionFilters(editInfo);
+                final FFmpegFrameFilter transitionFilter = FFmpegUtil.populateTransitionFilters(editInfo);
 
                 // Add the filters to a chain.
                 // TODO: Add to a ffmpeg chain?? Join the filters with a semicolon
@@ -255,7 +254,7 @@ public class VideoEditor {
     }
 
     private void recordAudio(final FFmpegFrameGrabber audioGrabber, final FFmpegFrameRecorder recorder) throws FFmpegFrameFilter.Exception, FFmpegFrameGrabber.Exception, FFmpegFrameRecorder.Exception {
-        final FFmpegFrameFilter simpleAudioFiler = this.populateAudioFilters();
+        final FFmpegFrameFilter simpleAudioFiler = FFmpegUtil.populateAudioFilters();
 
         /* Audio frame grabbing */
         Frame audioFrame;
@@ -359,93 +358,5 @@ public class VideoEditor {
         return segmentFiles;
     }
 
-    private FFmpegFrameFilter populateTransitionFilters(EditInfo editInfo) throws FFmpegFrameFilter.Exception {
-        final StringBuilder combinedFilters = new StringBuilder();
 
-        final List<Filter> transitions = FilterManager.FILTER_MANAGER.getTransitions();
-
-        for (int i = 0; i < transitions.size(); i++) {
-            final Filter transition = transitions.get(i);
-
-            combinedFilters
-                    .append(transition.getFilter());
-
-            if (i < transitions.size() - 1) {
-                combinedFilters.append(",");
-            }
-        }
-
-
-        if (combinedFilters.length() == 0)
-            return null;
-
-        final FFmpegFrameFilter transitionFilter = new FFmpegFrameFilter(combinedFilters.toString(), editInfo.getImageWidth(), editInfo.getImageHeight());
-        transitionFilter.setPixelFormat(editInfo.getPixelFormat());
-        transitionFilter.setFrameRate(editInfo.getFrameRate());
-        transitionFilter.start();
-
-        return transitionFilter;
-    }
-
-
-    private FFmpegFrameFilter populateAudioFilters() throws FFmpegFrameFilter.Exception {
-        final StringBuilder combinedFilters = new StringBuilder();
-
-        final List<Filter> audioFilters = FilterManager.FILTER_MANAGER.getAudioFilters();
-
-        for (int i = 0; i < audioFilters.size(); i++) {
-            final Filter audioFilter = audioFilters.get(i);
-
-            combinedFilters
-                    .append(audioFilter.getFilter());
-
-            if (i < audioFilters.size() - 1) {
-                combinedFilters.append(",");
-            }
-        }
-
-        if (combinedFilters.length() == 0)
-            return null;
-
-        final FFmpegFrameFilter audioFilter = new FFmpegFrameFilter(combinedFilters.toString(), 2);
-        audioFilter.start();
-
-        return audioFilter;
-    }
-
-
-
-
-    /*
-    TODO: find a new way, maybe just a manager with all the filters, that shouldnt be bad..
-     */
-
-    private FFmpegFrameFilter populateVideoFilters(final EditInfo editInfo) throws FFmpegFrameFilter.Exception {
-        final StringBuilder combinedFilters = new StringBuilder();
-
-        final List<Filter> videoFilters = FilterManager.FILTER_MANAGER.getVideoFilters();
-
-        for (int i = 0; i < videoFilters.size(); i++) {
-            final Filter videoFilter = videoFilters.get(i);
-
-            combinedFilters
-                    .append(videoFilter.getFilter());
-
-            if (i < videoFilters.size() - 1) {
-                combinedFilters.append(",");
-            }
-        }
-
-
-        if (combinedFilters.length() == 0)
-            return null;
-
-        final FFmpegFrameFilter videoFilter = new FFmpegFrameFilter(combinedFilters.toString(), editInfo.getImageWidth(), editInfo.getImageHeight());
-        videoFilter.setPixelFormat(editInfo.getPixelFormat());
-        videoFilter.setFrameRate(editInfo.getFrameRate());
-        videoFilter.setVideoInputs(1);
-        videoFilter.start();
-
-        return videoFilter;
-    }
 }
