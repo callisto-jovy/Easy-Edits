@@ -48,7 +48,7 @@ public class FilterManager {
             }
         }
 
-        return new ArrayList<>();
+        return availableFilters;
     }
 
 
