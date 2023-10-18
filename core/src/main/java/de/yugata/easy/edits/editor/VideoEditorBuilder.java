@@ -127,7 +127,7 @@ public class VideoEditorBuilder {
 
         return setVideoPath(sourceVideo)
                 .setWorkingDirectory(new File(workingPath))
-                .setOutputFile(new File(workingPath, outputPath))
+                .setOutputFile(new File(outputPath))
                 .setAudioPath(sourceAudio)
                 .setFilters(mappedFilters)
                 .setFlags(mappedEditingFlags)
