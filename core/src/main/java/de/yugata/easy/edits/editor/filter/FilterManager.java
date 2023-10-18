@@ -4,6 +4,7 @@ package de.yugata.easy.edits.editor.filter;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import de.yugata.easy.edits.editor.EditInfo;
+import de.yugata.easy.edits.editor.FlutterWrapper;
 
 import java.io.File;
 import java.io.FileReader;
@@ -19,26 +20,24 @@ public class FilterManager {
 
     public static final FilterManager FILTER_MANAGER = new FilterManager();
 
-
     private final List<Filter> filters = new ArrayList<>();
-
-    private final List<FilterWrapper> availableFilters = new ArrayList<>();
 
 
     public FilterManager() {
-        this.populateAvailableFilters();
     }
 
-    private void populateAvailableFilters() {
+    public List<FlutterWrapper.FlutterFilterWrapper> getAvailableFilters() {
         if (!checkFilterAvailability())
-            return;
+            return new ArrayList<>();
+
+        final List<FlutterWrapper.FlutterFilterWrapper> availableFilters = new ArrayList<>();
 
         final File[] files = FILTER_DIR.listFiles();
 
         for (final File file : files) {
             try {
                 final JsonElement root = JsonParser.parseReader(new FileReader(file));
-                final FilterWrapper wrapper = FilterParser.getFilterWrapper(root);
+                final FlutterWrapper.FlutterFilterWrapper wrapper = FilterParser.getFilterWrapper(root);
 
                 availableFilters.add(wrapper);
 
@@ -49,6 +48,7 @@ public class FilterManager {
             }
         }
 
+        return new ArrayList<>();
     }
 
 
@@ -114,9 +114,5 @@ public class FilterManager {
 
     public List<Filter> getAudioFilters() {
         return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.AUDIO).collect(Collectors.toList());
-    }
-
-    public List<FilterWrapper> getAvailableFilters() {
-        return availableFilters;
     }
 }

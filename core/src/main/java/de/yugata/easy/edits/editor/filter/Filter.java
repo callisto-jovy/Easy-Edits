@@ -8,7 +8,7 @@ public class Filter {
     private final FilterType filterType;
 
 
-    public Filter(String name, String description, String filter, FilterType filterType) {
+    public Filter(final String name, final String description, final String filter, final FilterType filterType) {
         this.name = name;
         this.description = description;
         this.filter = filter;

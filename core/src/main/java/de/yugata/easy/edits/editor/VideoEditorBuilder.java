@@ -99,9 +99,10 @@ public class VideoEditorBuilder {
                 values.add(new FilterValue(s, jsonElement1.getAsString()));
             });
 
-            final FilterWrapper wrapper = new FilterWrapper(name, "", values);
+            final FilterWrapper wrapper = new FilterWrapper(name, "", "", values);
             mappedFilters.add(wrapper);
         });
+
 
         final List<Long> mappedTimeStamps = new ArrayList<>();
         timeStamps.forEach(jsonElement -> mappedTimeStamps.add(jsonElement.getAsLong()));
@@ -110,10 +111,12 @@ public class VideoEditorBuilder {
         beatTimes.forEach(jsonElement -> mappedBeatTimes.add(jsonElement.getAsDouble()));
 
         final EnumSet<EditingFlag> mappedEditingFlags = EnumSet.noneOf(EditingFlag.class);
+
         editingFlags.asMap().forEach((key, value) -> {
             if (value.getAsBoolean())
                 mappedEditingFlags.add(EditingFlag.valueOf(key));
         });
+
 
         final String sourceVideo = root.get("source_video").getAsString();
         final String sourceAudio = root.get("source_audio").getAsString();
