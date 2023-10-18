@@ -104,13 +104,13 @@ public class FilterParser {
 
         // Nothing to parse
         if (settings.isEmpty())
-            return new Filter(name, "", rawCommand, filterType);
+            return new Filter(name, rawCommand, filterType);
 
 
         // Parse the command
         final String parsedCommand = parseCommand(filterWrapper, rawCommand, settings);
 
-        return new Filter(name, "", parsedCommand, filterType);
+        return new Filter(name, parsedCommand, filterType);
     }
 
 
