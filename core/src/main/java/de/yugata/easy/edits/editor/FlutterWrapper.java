@@ -59,6 +59,10 @@ public class FlutterWrapper {
         }
 
 
+        public String getHelpText() {
+            return helpText;
+        }
+
         public String getName() {
             return name;
         }
