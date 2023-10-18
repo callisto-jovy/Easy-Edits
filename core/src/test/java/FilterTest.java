@@ -6,7 +6,6 @@ import de.yugata.easy.edits.editor.filter.FilterManager;
 import de.yugata.easy.edits.editor.filter.FilterType;
 import de.yugata.easy.edits.editor.filter.FilterWrapper;
 import org.bytedeco.javacv.FFmpegFrameFilter;
-import org.bytedeco.libfreenect._freenect_context;
 
 import java.util.List;
 import java.util.stream.Collectors;

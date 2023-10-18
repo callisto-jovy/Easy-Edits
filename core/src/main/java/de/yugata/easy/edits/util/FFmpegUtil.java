@@ -29,7 +29,12 @@ public class FFmpegUtil {
         }
     }
 
-    //TODO: Multiple fonts??
+    /**
+     * Attempts to download a font file into the resource directory.
+     * Falls back to arial if a IOException is thrown. Formats the path to the file to a FFMPEG-acceptable format.
+     *
+     * @return cleaned string to the font file downloaded / fallback.
+     */
     public static String getFontFile() {
         // Download the font file to the temp.
         File dalton = new File(RESOURCE_DIRECTORY, "dalton.otf");
@@ -39,19 +44,35 @@ public class FFmpegUtil {
                 FileUtils.copyURLToFile(new URL("https://github.com/callisto-jovy/Fast-Edits/releases/download/external/Dalton.otf"), dalton);
         } catch (IOException e) {
             e.printStackTrace();
-            return cleanPath("C:/Windows/Fonts/Arial.ttf");
+            return sanitizePath("C:/Windows/Fonts/Arial.ttf");
         }
 
         // Our font file is in the resources, but ffmpeg needs an absolute path
-        return cleanPath(dalton.getAbsolutePath());
+        return sanitizePath(dalton.getAbsolutePath());
     }
 
-    public static String cleanPath(final String filePath) {
+    /**
+     * Sanitizes a given filepath to ensure that FFMPEG will accept it.
+     * Removes all backwards slashes and replaces them with forwards slashes.
+     * The colon (i.e. C:) is escaped.
+     *
+     * @param filePath the file path to sanitize
+     * @return the sanitized filepath
+     */
+    public static String sanitizePath(final String filePath) {
         return filePath
                 .replace('\\', '/')
                 .replace(":", "\\:");
     }
 
+    /**
+     * Pushes a {@link Frame} through a pipeline (array) of {@link FFmpegFrameFilter}.
+     * Lastly the frame(s) are recorded by the supplied {@link FFmpegFrameRecorder}.
+     *
+     * @param frame    the frame to push through the filters that is supposed to be recorded.
+     * @param recorder the recorder to record the frame(s) to.
+     * @param filters  array of filters the frame is pushed through and pulled from.
+     */
     public static void pushToFilters(final Frame frame, final FFmpegFrameRecorder recorder, final FFmpegFrameFilter... filters) {
         try {
             // just record if no filters are in the chain.
@@ -94,18 +115,6 @@ public class FFmpegUtil {
         grabber.setAudioStream(1);
         grabber.setVideoBitrate(0);
     }
-
-    public static FFmpegFrameGrabber createGrabber(final String filePath) throws FFmpegFrameGrabber.Exception {
-        final FFmpegFrameGrabber frameGrabber = new FFmpegFrameGrabber(filePath);
-        frameGrabber.setOption("allowed_extensions", "ALL");
-        frameGrabber.setOption("hwaccel", "cuda");
-        frameGrabber.setVideoCodecName("h264_cuvid");
-
-        frameGrabber.setAudioStream(1);
-        frameGrabber.start();
-        return frameGrabber;
-    }
-
 
     public static FFmpegFrameRecorder createRecorder(final File outputFile, final EnumSet<EditingFlag> editingFlags, final FFmpegFrameGrabber inputGrabber) throws FFmpegFrameRecorder.Exception {
         final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(outputFile, inputGrabber.getImageWidth(), inputGrabber.getImageHeight(), 2);
@@ -152,10 +161,18 @@ public class FFmpegUtil {
         return recorder;
     }
 
+    /**
+     * Chains a list of {@link Filter} together.
+     * Will add an [in] and [out], as well as passthroughs to all the intermediary filters.
+     * sample chaining result: <br>
+     * [in]fade=t=in:st=0:d=120ms[f0]; [f0]curves=preset=medium_contrast[c0]; [c0]curves=preset=lighter[c1]; [c1]curves=all='0/0 0.5/0.4 1/1'[out]
+     *
+     * @param filters list of filters to chain.
+     * @return all chained filters in one string.
+     */
     private static String chainFilters(final List<Filter> filters) {
         if (filters.isEmpty()) return null;
         final StringBuilder chainedFilters = new StringBuilder();
-
 
         // Add in to first filter...
         chainedFilters.append("[in]");
@@ -163,16 +180,18 @@ public class FFmpegUtil {
         for (int i = 0; i < filters.size(); i++) {
             final Filter videoFilter = filters.get(i);
 
+            // Only add if the filter is not the first in the list.
             if (i > 0) {
                 chainedFilters
                         .append("[f")
                         .append((i - 1))
                         .append("]");
             }
-
+            // append the filter
             chainedFilters
                     .append(videoFilter.getFilter());
 
+            // Append output if this filter is not the last one
             if (i < filters.size() - 1) {
                 chainedFilters
                         .append("[f")
@@ -182,7 +201,7 @@ public class FFmpegUtil {
                 // --> [f i]; so that in the next iteration this will be the input.
             }
         }
-
+        // Append destination for the last filter in the chain
         chainedFilters.append("[out]");
 
         return chainedFilters.toString();
