@@ -99,7 +99,7 @@ public class VideoEditorBuilder {
                 values.add(new FilterValue(s, jsonElement1.getAsString()));
             });
 
-            final FilterWrapper wrapper = new FilterWrapper(name, "", "", values);
+            final FilterWrapper wrapper = new FilterWrapper(name,  values);
             mappedFilters.add(wrapper);
         });
 
