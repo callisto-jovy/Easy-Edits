@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import de.yugata.easy.edits.editor.EditInfo;
+import de.yugata.easy.edits.editor.FlutterWrapper;
 import de.yugata.easy.edits.util.FFmpegUtil;
 import org.bytedeco.javacpp.tools.ParserException;
 
@@ -28,29 +29,48 @@ public class FilterParser {
     }
 
 
-    public static FilterWrapper getFilterWrapper(final JsonElement element) throws Exception {
+    private static Optional<JsonElement> getOr(final JsonObject element, final String key) {
+        return Optional.ofNullable(element.get(key));
+    }
+
+    public static FlutterWrapper.FlutterFilterWrapper getFilterWrapper(final JsonElement element) throws Exception {
         if (!element.isJsonObject()) {
             throw new ParserException("Filter root object is not a json object.");
         }
 
         final JsonObject root = element.getAsJsonObject();
+        // The id has to be specified. If a nullpointer is thrown, that means that the filter is not formatted properly
+        // TODO: Handle these exceptions.
         final String name = root.get("name").getAsString();
-        final String description = root.get("description").getAsString();
+        // grab description or map default.
+        final String description = getOr(root, "description").map(JsonElement::getAsString).orElse("No description available for this filter.");
+
+        // Get the display name. If no display name is there, we just fall back to the name (id)
+        final String displayName = getOr(root, "display_name").map(JsonElement::getAsString).orElse(name);
+
+        // Grab the type.
+        final String type = root.get("type").getAsString().toUpperCase();
+        final FilterType filterType = FilterType.valueOf(type);
+
+        // optional help text
+        final String helpText = getOr(root, "help").map(JsonElement::getAsString).orElse("No help text available");
+
+
         final List<FilterValue> values = new ArrayList<>();
 
-
         root.getAsJsonArray("settings").forEach(jsonElement -> {
-            final JsonObject object = jsonElement.getAsJsonObject();
-            final String valueName = object.get("name").getAsString();
-            final String value = object.has("default") ? object.get("default").getAsString() : "";
+            final JsonObject setting = jsonElement.getAsJsonObject();
+            final String valueName = setting.get("name").getAsString();
+            final String value = setting.has("default") ? setting.get("default").getAsString() : "";
 
-            //TODO: use enum
-            if (object.get("type").getAsString().toUpperCase().equals("VALUE")) {
+            final TokenType tokenType = TokenType.valueOf(setting.get("type").getAsString().toUpperCase());
+
+            if (tokenType == TokenType.VALUE) {
                 values.add(new FilterValue(valueName, value));
             }
         });
 
-        return new FilterWrapper(name, description, values);
+        return new FlutterWrapper.FlutterFilterWrapper(name, displayName, description, helpText, filterType, values);
     }
 
 
@@ -72,24 +92,33 @@ public class FilterParser {
 
         // Grab type.
         final String type = root.get("type").getAsString().toUpperCase();
+        final FilterType filterType = FilterType.valueOf(type);
+
         // grab the id (name)
         final String name = root.get("name").getAsString();
-        final String displayName = root.get("display_name").getAsString();
+        // The raw command that may be parsed.
         final String rawCommand = root.get("command").getAsString();
 
+        // Array of all the "settings", e.g. tokens that have to be resolved.
         final JsonArray settings = root.getAsJsonArray("settings");
+
+        // Nothing to parse
+        if (settings.isEmpty())
+            return new Filter(name, "", rawCommand, filterType);
+
+
         // Parse the command
         final String parsedCommand = parseCommand(filterWrapper, rawCommand, settings);
 
-        final FilterType filterType = FilterType.valueOf(type);
-
-        return new Filter(name, displayName, parsedCommand, filterType);
+        return new Filter(name, "", parsedCommand, filterType);
     }
 
 
     private String parseCommand(final FilterWrapper filterWrapper, final String command, final JsonArray settings) {
         // Scan the command for items.
         final Matcher matcher = VARIABLE_PATTERN.matcher(command);
+
+        //TODO: Go through the settings, rather than the matches. In that case, we dont even need the matches..
 
         String parsedCommand = command;
 
@@ -120,9 +149,8 @@ public class FilterParser {
                 return value.map(FilterValue::getValue).orElse("");
             }
             // TODO: variable offsets may be set by values.
-
+            // TODO: make it possible to use time formatting.
         }
-
         return "";
     }
 
@@ -143,6 +171,8 @@ public class FilterParser {
 
 
     private enum TokenType {
+
+        // TODO:  Add a possibility for dropdown options in the json code.
         VARIABLE, VALUE
 
     }
@@ -173,6 +203,4 @@ public class FilterParser {
             this.offsetMapper = offsetMapper;
         }
     }
-
-
 }

@@ -6,20 +6,26 @@ public class FilterWrapper {
 
     private final String name;
 
+    private final String displayName;
+
     private final String description;
 
     private final List<FilterValue> values;
 
-    public FilterWrapper(String name, String description, List<FilterValue> values) {
+    public FilterWrapper(String name, String displayName, String description, List<FilterValue> values) {
         this.name = name;
+        this.displayName = displayName;
         this.description = description;
         this.values = values;
+    }
+
+    public String getDisplayName() {
+        return displayName;
     }
 
     public String getName() {
         return name;
     }
-
 
     public String getDescription() {
         return description;
