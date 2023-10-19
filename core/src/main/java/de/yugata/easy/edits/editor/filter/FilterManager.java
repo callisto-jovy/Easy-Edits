@@ -101,15 +101,6 @@ public class FilterManager {
         return true;
     }
 
-    public List<Filter> getComplexVideoFilters() {
-        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.COMPLEX_VIDEO).collect(Collectors.toList());
-
-    }
-
-    public List<Filter> getComplexAudioFilters() {
-        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.COMPLEX_AUDIO).collect(Collectors.toList());
-    }
-
 
     public List<Filter> getVideoFilters() {
         return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.VIDEO).collect(Collectors.toList());

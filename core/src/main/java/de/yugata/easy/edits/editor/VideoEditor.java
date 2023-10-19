@@ -15,11 +15,9 @@ import org.bytedeco.javacv.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static de.yugata.easy.edits.util.FFmpegUtil.FFMPEG_BIN;
-import static de.yugata.easy.edits.util.FFmpegUtil.RESOURCE_DIRECTORY;
 import static org.bytedeco.ffmpeg.global.avutil.AV_LOG_VERBOSE;
 import static org.bytedeco.ffmpeg.global.avutil.av_log_set_level;
 
@@ -54,7 +52,7 @@ public class VideoEditor {
 
     private final List<FilterWrapper> filters;
 
-    private final File outputFile, workingDirectory;
+    private final File outputFile, workingDirectory, outputDirectory;
 
 
     public VideoEditor(final String videoPath,
@@ -87,6 +85,11 @@ public class VideoEditor {
         } else {
             this.outputFile = outputFile;
         }
+
+        this.outputDirectory = new File(workingDirectory.getParent(), "output");
+
+        if (!outputDirectory.exists())
+            outputDirectory.mkdirs();
 
 
         if (flags.contains(EditingFlag.PRINT_DEBUG)) {
@@ -128,21 +131,51 @@ public class VideoEditor {
         }
     }
 
-    private List<File> collectSegments(final boolean useSegments) {
-        if (useSegments) {
-            return Arrays.stream(Objects.requireNonNull(workingDirectory.listFiles()))
-                    .sorted(Comparator.comparingInt(value -> Integer.parseInt(value.getName().substring("segment ".length(), value.getName().lastIndexOf(".")))))
-                    .collect(Collectors.toList());
+    public List<File> processSegments(final List<File> segments) {
+        final List<File> files = new ArrayList<>();
 
-        } else {
-            return writeSegments();
+        for (final File segment : segments) {
+            final FFmpeg builder = FFmpeg.atPath(FFMPEG_BIN.toPath());
+
+            final File outputFile = new File(outputDirectory, segment.getName());
+
+
+            builder.addInput(UrlInput.fromPath(segment.toPath()))       // Segment is the input
+                    .addOutput(UrlOutput.toPath(outputFile.toPath())) // Output segment in output dir
+                    .setLogLevel(LogLevel.INFO)
+                    .addArguments("-c:v", "libx265")
+                    .setOutputListener(System.out::println);
+
+
+            // Add filters
+
+            // TODO: new data class
+            final EditInfo editInfo = new EditInfoBuilder()
+                    .setEditTime(AudioUtil.estimateEditLengthInMicros(audioPath))
+                    .setIntroStart(introStart)
+                    .setIntroEnd(introEnd)
+                    .createEditInfo();
+
+            // Populate the filters
+            FilterManager.FILTER_MANAGER.populateFilters(filters, editInfo);
+
+            /* Configure the  filters. */
+            final String videoFilter = FFmpegUtil.chainVideoFilters();
+            final String audioFilter = FFmpegUtil.chainAudioFilters();
+
+            builder.setFilter(StreamType.AUDIO, audioFilter);
+            builder.setFilter(StreamType.VIDEO, videoFilter);
+
+            // Execute new command
+            builder.execute();
+
+            files.add(outputFile);
         }
+        return files;
     }
 
-    public void edit(final boolean useSegments) {
 
-        // Write the segment files that will be stitched together.
-        final List<File> segments = collectSegments(useSegments);
+    public void concatSegments(final List<File> segments) {
 
         // TODO: re add intro support, just export the intro segments & stich them in the front
         final FFmpeg builder = FFmpeg.atPath(FFMPEG_BIN.toPath());
@@ -154,12 +187,12 @@ public class VideoEditor {
 
         // just add the output here
         builder.addOutput(UrlOutput.toPath(outputFile.toPath()))
-                .addInput(UrlInput.fromUrl(audioPath)) // The audio input is the last input added (segments.size() + 1)
+                .addInput(UrlInput.fromUrl(audioPath)) // The audio input is the last input added (segments.size())
                 .setLogLevel(LogLevel.INFO)
                 .addArguments("-c:v", "libx265")
                 .setOutputListener(System.out::println);
 
-
+/*
         // Add intro offset if requested
         if (introStart != -1 && introEnd != -1) {
             // offset the audio timestamp by the intro start, so that the intro keeps its original audio if that's requested.
@@ -171,39 +204,16 @@ public class VideoEditor {
             }
 
             //TODO Intro
-
         }
+ */
 
+        // Todo: maybe complex filters can be passed here.
 
-        // Add filters
-
-        // Edit: I fucking hate this, we just pass the frame grabber in the fucking future...
-        // TODO: new data class
-        final EditInfo editInfo = new EditInfoBuilder()
-                .setEditTime(AudioUtil.estimateEditLengthInMicros(audioPath))
-                .setIntroStart(introStart)
-                .setIntroEnd(introEnd)
-                .createEditInfo();
-
-        final String complexConcat = String.format("concat=n=%d:v=1:a=0 [v] [a]", segments.size());
-
-        // Populate the filters
-        FilterManager.FILTER_MANAGER.populateFilters(filters, editInfo);
-
-        /* Configure the  filters. */
-        final String videoFilter = FFmpegUtil.chainVideoFilters();
-        final String complexFilter = FFmpegUtil.chainComplexFilters(segments.size());
-        final String audioFilter = FFmpegUtil.chainAudioFilters();
-
-        builder.setFilter(StreamType.AUDIO, audioFilter);
-        builder.setFilter(StreamType.VIDEO, videoFilter);
-        // Complex filters
-        builder.setComplexFilter(complexFilter.concat(complexConcat));
-
-        builder.addArguments("-map", "[v]");
+        //   builder.addArguments("-map", "[v]");
         builder.addArguments("-map", String.format("%d:a", segments.size())); //TODO: Complex audio filters
+        builder.addArgument("-concat");
 
-        // execute
+        // execute, concat the segments. & add the audio
         builder.execute();
     }
 

@@ -77,7 +77,7 @@ public class Editor {
      * Throws an IllegalArgumentException if the beat queue is empty.
      * Then edits the video with the given inputs.
      */
-    public void runEditing(final boolean useSegments) {
+    public void runEditing() {
         if (timeBetweenBeats.isEmpty()) {
             throw new IllegalArgumentException("The audio has not been analysed or no beats have been detected, in that case adjust the threshold.");
         }
@@ -100,7 +100,10 @@ public class Editor {
                 .setVideoTimeStamps(new ArrayList<>(timeStamps))
                 .createVideoEditor();
 
-        editor.edit(useSegments);
+
+        final List<File> rawSegments = editor.writeSegments();
+        final List<File> processedSegments = editor.processSegments(rawSegments);
+        editor.concatSegments(processedSegments); // Concat processed segments.
     }
 
 
