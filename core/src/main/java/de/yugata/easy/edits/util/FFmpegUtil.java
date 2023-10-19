@@ -1,13 +1,14 @@
 package de.yugata.easy.edits.util;
 
 
+import com.github.kokorin.jaffree.ffmpeg.FilterChain;
+import com.github.kokorin.jaffree.ffmpeg.GenericFilter;
 import de.yugata.easy.edits.editor.EditingFlag;
 import de.yugata.easy.edits.editor.filter.Filter;
 import de.yugata.easy.edits.editor.filter.FilterManager;
 import org.apache.commons.io.FileUtils;
 import org.bytedeco.ffmpeg.global.avcodec;
 import org.bytedeco.ffmpeg.global.avutil;
-import org.bytedeco.javacpp.tools.Slf4jLogger;
 import org.bytedeco.javacv.*;
 
 import java.io.File;
@@ -16,6 +17,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.channels.Channels;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -224,6 +226,7 @@ public class FFmpegUtil {
         // Add in to first filter...
         chainedFilters.append("[in]");
 
+        chainFilters(filters, chainedFilters);
 
         // Append destination for the last filter in the chain
         chainedFilters.append("[out]");
@@ -279,8 +282,7 @@ public class FFmpegUtil {
         if (filters.isEmpty())
             return null;
 
-        final String chained = chainSimpleFilters(filters);
-        return chained;
+        return chainSimpleFilters(filters);
     }
 
 
@@ -290,9 +292,64 @@ public class FFmpegUtil {
         if (filters.isEmpty())
             return null;
 
-        final String chained = chainSimpleFilters(filters);
-        return chained;
+        return chainSimpleFilters(filters);
     }
+
+    /**
+     * TODO: This will be a massive fucking pain in the ass...
+     * The filters will have to be "re-parsed", to set certain variables which are only clear from the number of segments that are available
+     * & the filter's position in the filter chain...
+     * fuck me, we also need to know the offset, so somehow, we need to read the segment & apply the filters...
+     * this would be so much easier with javacv, but certain filters are not there, which are really needed...
+     * I will figure this out somehow...
+     * Maybe concat two videos, then the next, etc. in that case, the offset will always be 0.
+     * Or maybe, there are no fade transitions...
+     * and variables such as offset are not possible for this project
+     * idk man
+     *
+     * @param segments
+     * @return
+     */
+    public static String chainComplexFilters(final int segments) {
+        final List<Filter> videoFilters = FilterManager.FILTER_MANAGER.getComplexVideoFilters();
+
+        final StringBuilder chainedFilters = new StringBuilder();
+
+        if (videoFilters.isEmpty()) {
+            // prepare inputs for concat
+            for (int i = 0; i < segments; i++) {
+                chainedFilters.append("[").append(i).append(":v]");
+            }
+            return chainedFilters.toString();
+
+            // --> [v0][v1][v2]...[vn] inputs to concat.
+        }
+
+
+        for (int i = 0; i < segments; i++) {
+
+            // Video input for filter (x...)
+            // [n:v] input
+            chainedFilters.append("[").append(i).append(":v]");
+            chainFilters(videoFilters, chainedFilters);
+            // output [vn];
+            chainedFilters
+                    .append("[")
+                    .append("v")
+                    .append(i)
+                    .append("]")
+                    .append(";");
+        }
+
+        // prepare inputs for concat
+        for (int i = 0; i < segments; i++) {
+            chainedFilters.append("[v").append(i).append("]");
+        }
+
+        // --> [v0][v1][v2]...[vn] inputs to concat.
+        return chainedFilters.toString();
+    }
+
 
     private static void unzipFFmpeg(final File zip, final File dest) {
         FileInputStream fis;
@@ -331,5 +388,140 @@ public class FFmpegUtil {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+
+    public static FilterChain parseFilterChain(final String filterChain) {
+        final List<GenericFilter> chain = new ArrayList<>();
+
+        // Split this at a colon...
+
+        StringBuilder sequence = new StringBuilder();
+
+        boolean charEscaped = false, escapedSequence = false;
+
+        for (final char fChar : filterChain.toCharArray()) {
+            switch (fChar) {
+                case '"':
+                case '\'': {
+                    if (!charEscaped)
+                        escapedSequence = !escapedSequence;
+                    else
+                        charEscaped = false;
+
+                    break;
+                }
+
+                case '\\':
+                    charEscaped = true;
+                    break;
+
+                case ',': {
+
+                    if (!escapedSequence) {
+                        chain.add(parseGenericFilter(sequence.toString()));
+
+                        sequence = new StringBuilder(); // reset sequence
+                    }
+                    continue;
+                }
+
+                default:
+                    break;
+            }
+
+            sequence.append(fChar);
+        }
+
+
+        // There is more to parse...
+        if (sequence.length() > 0) {
+            chain.add(parseGenericFilter(sequence.toString()));
+        }
+
+        return new FilterChain().addFilters(chain);
+    }
+
+
+    public static GenericFilter parseGenericFilter(final String filter) {
+
+        // get the name
+        final String name = StringUtil.substringUntil(filter, "=");
+        final int nameEndIndex = filter.indexOf("=") + 1;
+
+
+        return parseFilterChars(filter.substring(nameEndIndex).toCharArray(), name);
+    }
+
+    private static GenericFilter parseFilterChars(final char[] fChars, final String filterName) {
+
+        final GenericFilter filter = com.github.kokorin.jaffree.ffmpeg.Filter
+                .withName(filterName);
+
+        final List<String> tokens = new ArrayList<>();
+
+        StringBuffer sequence = new StringBuffer();
+
+        boolean charEscaped = false, escapedSequence = false, isArguments = false;
+
+        for (final char fChar : fChars) {
+            switch (fChar) {
+                case '"':
+                case '\'': {
+                    if (!charEscaped)
+                        escapedSequence = !escapedSequence;
+                    else
+                        charEscaped = false;
+
+                    break;
+                }
+
+                case ':': {
+                    isArguments = true;
+
+
+                    // Terminates the argument anyway
+                    if (!escapedSequence) {
+                        tokens.add(sequence.toString());
+                        System.out.println(tokens);
+                        filter.addArgument(tokens.get(0), tokens.get(1));
+                        tokens.clear();
+                        sequence = new StringBuffer();
+                    }
+                    continue;
+                }
+
+
+                case '\\':
+                    charEscaped = true;
+                    break;
+
+                case '=': {
+                    // New token from the last sequence.
+                    if (!escapedSequence) {
+                        tokens.add(sequence.toString());
+                        sequence = new StringBuffer();
+                    }
+
+                    continue;
+                }
+
+                default:
+                    break;
+            }
+
+            sequence.append(fChar);
+        }
+        // Add the remaining chars to the tokens.
+        tokens.add(sequence.toString());
+
+        System.out.println(tokens);
+
+        for (String token : tokens) {
+            filter.addArgument(token);
+        }
+
+        System.out.println(filter.getValue());
+        return filter;
     }
 }
