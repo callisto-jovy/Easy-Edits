@@ -4,6 +4,7 @@ package de.yugata.easy.edits.editor;
 import de.yugata.easy.edits.editor.filter.FilterType;
 import de.yugata.easy.edits.editor.filter.FilterValue;
 
+import java.io.File;
 import java.util.List;
 
 import static de.yugata.easy.edits.editor.filter.FilterManager.FILTER_MANAGER;
@@ -19,16 +20,18 @@ public class FlutterWrapper {
         final VideoEditor videoEditor = new VideoEditorBuilder()
                 .fromJson(json);
 
-        videoEditor.writeSegments();
+        final List<File> rawSegments = videoEditor.writeSegments();
+        videoEditor.processSegments(rawSegments); // ignore the result
     }
 
     public static void edit(final String json) {
         final VideoEditor videoEditor = new VideoEditorBuilder()
                 .fromJson(json);
 
-        videoEditor.edit(false);
+        final List<File> rawSegments = videoEditor.writeSegments();
+        final List<File> processedSegments = videoEditor.processSegments(rawSegments);
+        videoEditor.concatSegments(processedSegments); // Concat processed segments.
     }
-
 
     /**
      * Data class to pass to the frontend containing the data the frontend needs to display the filter,

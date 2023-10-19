@@ -14,8 +14,8 @@ public class EditCommand {
 
     @ShellMethod(value = "Start the editing process", group = "Workflow")
     @ShellMethodAvailability("editingAvailability")
-    public void edit(@ShellOption(value = {"use", "segments"}, defaultValue = "false") boolean useSegments) {
-        Editor.INSTANCE.runEditing(useSegments);
+    public void edit() {
+        Editor.INSTANCE.runEditing();
     }
 
     public Availability editingAvailability() {
