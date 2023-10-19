@@ -7,13 +7,19 @@ import de.yugata.easy.edits.editor.filter.FilterManager;
 import org.apache.commons.io.FileUtils;
 import org.bytedeco.ffmpeg.global.avcodec;
 import org.bytedeco.ffmpeg.global.avutil;
+import org.bytedeco.javacpp.tools.Slf4jLogger;
 import org.bytedeco.javacv.*;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.channels.Channels;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 /**
  * TODO: This needs some documentation, not only for other, but also for myself.
@@ -21,11 +27,18 @@ import java.util.List;
 public class FFmpegUtil {
 
     public static final File RESOURCE_DIRECTORY = new File("editor_resources");
+
+    public static final File FFMPEG_BIN = new File(RESOURCE_DIRECTORY, "ffmpeg_bin");
+
     public static final String LATEST_FFMPEG = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
 
     static {
         if (!RESOURCE_DIRECTORY.exists()) {
             RESOURCE_DIRECTORY.mkdir();
+        }
+
+        if (!FFMPEG_BIN.exists()) {
+            FFMPEG_BIN.mkdirs();
         }
 
         loadFFmpeg();
@@ -39,11 +52,26 @@ public class FFmpegUtil {
 
 
     public static void loadFFmpeg() {
+        // TODO: Versioning, editor_resources should have a file with the latest auto build version.
+        // Or: timer that loads the new version every month / week
+
+        if (FFMPEG_BIN.length() > 0)
+            return;
+
+        System.out.println("Downloading latest FFMPEG.");
+
+        final File output = new File(FFMPEG_BIN, "ffmpeg.zip");
+
         try {
-            FileUtils.copyURLToFile(new URL(LATEST_FFMPEG), new File(RESOURCE_DIRECTORY, LATEST_FFMPEG));
+            FileUtils.copyURLToFile(new URL(LATEST_FFMPEG), output);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        // Extract zip
+        unzipFFmpeg(output, FFMPEG_BIN);
+
+        // Delete zip
+        output.delete();
     }
 
 
@@ -337,4 +365,42 @@ public class FFmpegUtil {
         return chained;
     }
 
+    private static void unzipFFmpeg(final File zip, final File dest) {
+        FileInputStream fis;
+        try {
+            fis = new FileInputStream(zip);
+            final ZipInputStream zis = new ZipInputStream(fis);
+
+            ZipEntry zipEntry;
+
+            while ((zipEntry = zis.getNextEntry()) != null) {
+                // Skip subdirectories, we want all files in one place.
+                if (zipEntry.isDirectory()) {
+                    System.out.println(zipEntry.getName() + "is directory, skipping.");
+                    continue;
+                }
+
+                // name includes the path, so we have to strip it.
+                final String name = zipEntry.getName().substring(zipEntry.getName().lastIndexOf('/') + 1);
+
+                final File newFile = new File(dest, name);
+                System.out.println("Unzipping to " + newFile.getAbsolutePath());
+
+                // Transfer data using channels
+
+                final FileOutputStream fos = new FileOutputStream(newFile);
+                fos.getChannel().transferFrom(Channels.newChannel(zis), 0, Long.MAX_VALUE);
+                fos.close();
+
+                //close this ZipEntry
+                zis.closeEntry();
+            }
+            //close last ZipEntry
+            zis.closeEntry();
+            zis.close();
+            fis.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }

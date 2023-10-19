@@ -18,6 +18,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static de.yugata.easy.edits.util.FFmpegUtil.FFMPEG_BIN;
 import static de.yugata.easy.edits.util.FFmpegUtil.RESOURCE_DIRECTORY;
 import static org.bytedeco.ffmpeg.global.avutil.AV_LOG_VERBOSE;
 import static org.bytedeco.ffmpeg.global.avutil.av_log_set_level;
@@ -144,8 +145,7 @@ public class VideoEditor {
         final List<File> segments = collectSegments(useSegments);
 
         // TODO: re add intro support, just export the intro segments & stich them in the front
-        // TODO: BIN
-        final FFmpeg builder = FFmpeg.atPath(RESOURCE_DIRECTORY.toPath());
+        final FFmpeg builder = FFmpeg.atPath(FFMPEG_BIN.toPath());
 
         // Add input(s)
         for (final File segment : segments) {

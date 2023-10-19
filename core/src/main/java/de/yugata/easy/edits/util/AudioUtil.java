@@ -11,6 +11,7 @@ import javax.sound.sampled.UnsupportedAudioFileException;
 import java.io.File;
 import java.io.IOException;
 
+import static de.yugata.easy.edits.util.FFmpegUtil.FFMPEG_BIN;
 import static de.yugata.easy.edits.util.FFmpegUtil.RESOURCE_DIRECTORY;
 
 public class AudioUtil {
@@ -31,7 +32,7 @@ public class AudioUtil {
             final File directTemp = File.createTempFile("temp_conversion", ".wav");
 
             // Convert the audio to a wav
-            final FFmpeg fFmpeg = FFmpeg.atPath(RESOURCE_DIRECTORY.toPath())
+            final FFmpeg fFmpeg = FFmpeg.atPath(FFMPEG_BIN.toPath())
                     .addInput(UrlInput.fromUrl(audioPath))
                     .addOutput(UrlOutput.toPath(directTemp.toPath()));
 
