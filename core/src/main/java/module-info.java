@@ -9,4 +9,5 @@ module Easy.Edits.core {
     requires com.google.gson;
     requires org.bytedeco.javacv;
     requires org.bytedeco.ffmpeg;
+    requires com.github.kokorin.jaffree;
 }
