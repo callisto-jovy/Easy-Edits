@@ -4,7 +4,6 @@ public enum FilterType {
 
     VIDEO,
     AUDIO,
-
-    TRANSITION,
-
+    COMPLEX_VIDEO,
+    COMPLEX_AUDIO,
 }

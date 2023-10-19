@@ -45,6 +45,7 @@ public class FilterManager {
                 System.err.println("Could not read filter. IO-Exception thrown.");
             } catch (Exception e) {
                 System.err.println("Error while parsing filter: " + e.getMessage());
+                e.printStackTrace();
             }
         }
 
@@ -79,6 +80,7 @@ public class FilterManager {
                     System.err.println("Could not read filter. IO-Exception thrown.");
                 } catch (Exception e) {
                     System.err.println("Error while parsing filter: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
         }
@@ -86,9 +88,6 @@ public class FilterManager {
 
     private boolean checkFilterAvailability() {
         // load the filters from the resources
-
-        System.out.println("Filter dir pos: " + FILTER_DIR.getAbsolutePath());
-
         if (!FILTER_DIR.exists()) {
             System.err.println("No filter directory exists at the required position. No filters were loaded.");
             return false;
@@ -102,8 +101,13 @@ public class FilterManager {
         return true;
     }
 
-    public List<Filter> getTransitions() {
-        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.TRANSITION).collect(Collectors.toList());
+    public List<Filter> getComplexVideoFilters() {
+        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.COMPLEX_VIDEO).collect(Collectors.toList());
+
+    }
+
+    public List<Filter> getComplexAudioFilters() {
+        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.COMPLEX_AUDIO).collect(Collectors.toList());
     }
 
 
