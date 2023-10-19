@@ -3,13 +3,13 @@ package de.yugata.easy.edits.editor;
 
 import com.github.kokorin.jaffree.LogLevel;
 import com.github.kokorin.jaffree.StreamType;
-import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
-import com.github.kokorin.jaffree.ffmpeg.UrlInput;
-import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
+import com.github.kokorin.jaffree.ffmpeg.*;
+import de.yugata.easy.edits.editor.filter.Filter;
 import de.yugata.easy.edits.editor.filter.FilterManager;
 import de.yugata.easy.edits.editor.filter.FilterWrapper;
 import de.yugata.easy.edits.util.AudioUtil;
 import de.yugata.easy.edits.util.FFmpegUtil;
+import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.*;
 
 import java.io.File;
@@ -131,6 +131,20 @@ public class VideoEditor {
         }
     }
 
+
+    public List<File> collectSegments() {
+        return Arrays.stream(Objects.requireNonNull(workingDirectory.listFiles()))
+                .sorted(Comparator.comparingInt(value -> Integer.parseInt(value.getName().substring("segment ".length(), value.getName().lastIndexOf(".")))))
+                .collect(Collectors.toList());
+    }
+
+    public List<File> collectProcessedSegments() {
+        return Arrays.stream(Objects.requireNonNull(outputDirectory.listFiles()))
+                .sorted(Comparator.comparingInt(value -> Integer.parseInt(value.getName().substring("segment ".length(), value.getName().lastIndexOf(".")))))
+                .collect(Collectors.toList());
+    }
+
+
     public List<File> processSegments(final List<File> segments) {
         final List<File> files = new ArrayList<>();
 
@@ -139,11 +153,11 @@ public class VideoEditor {
 
             final File outputFile = new File(outputDirectory, segment.getName());
 
-
             builder.addInput(UrlInput.fromPath(segment.toPath()))       // Segment is the input
                     .addOutput(UrlOutput.toPath(outputFile.toPath())) // Output segment in output dir
                     .setLogLevel(LogLevel.INFO)
                     .addArguments("-c:v", "libx265")
+                    .setOverwriteOutput(true)
                     .setOutputListener(System.out::println);
 
 
@@ -209,9 +223,67 @@ public class VideoEditor {
 
         // Todo: maybe complex filters can be passed here.
 
-        //   builder.addArguments("-map", "[v]");
+        final EditInfo editInfo = new EditInfoBuilder()
+                .setEditTime(AudioUtil.estimateEditLengthInMicros(audioPath))
+                .setIntroStart(introStart)
+                .setIntroEnd(introEnd)
+                .createEditInfo();
+
+        FilterManager.FILTER_MANAGER.populateFilters(filters, editInfo);
+
+        final List<FilterChain> filterChains = new ArrayList<>();
+
+        for (final Filter complexVideoFilter : FilterManager.FILTER_MANAGER.getComplexVideoFilters()) {
+            filterChains.add(FilterChain.of());
+        }
+        /*
+
+        // Chain filters
+
+        // split filter
+        for (final Filter complexVideoFilter : FilterManager.FILTER_MANAGER.getComplexVideoFilters()) {
+            // The chain to complete
+
+            final FilterChain filterChain = new FilterChain();
+            // the complex filter to parse
+            final String filter = complexVideoFilter.getFilter();
+
+            final String[] filters = filter.split(","); // split filter chain
+
+            // parse the string
+            if (filters.length == 0) {
+                final GenericFilter genericFilter = FFmpegUtil.parseGenericFilter(filter);
+                filterChain.addFilter(genericFilter);
+            } else {
+                for (final String f : filters) {
+                    final GenericFilter genericFilter = FFmpegUtil.parseGenericFilter(f);
+                    filterChain.addFilter(genericFilter);
+                }
+            }
+
+            // parse the multiple strings
+            filterChains.add(filterChain);
+        }
+
+         */
+
+        filterChains.add(FilterChain.of(
+                        com.github.kokorin.jaffree.ffmpeg.Filter
+                                .fromInputLink(StreamType.VIDEO)
+                                .setName("concat")
+                                .addArgument("n", String.valueOf(segments.size()))
+                                .addArgument("v", "1")
+                                .addArgument("a", "0")
+                                .addOutputLink("v")
+                )
+        );
+
+
+        builder.setComplexFilter(FilterGraph.of(filterChains.toArray(new FilterChain[]{})));
+
+
+        builder.addArguments("-map", "[v]");
         builder.addArguments("-map", String.format("%d:a", segments.size())); //TODO: Complex audio filters
-        builder.addArgument("-concat");
 
         // execute, concat the segments. & add the audio
         builder.execute();

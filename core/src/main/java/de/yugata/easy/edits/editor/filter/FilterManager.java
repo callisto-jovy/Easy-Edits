@@ -52,6 +52,13 @@ public class FilterManager {
         return availableFilters;
     }
 
+    /**
+     * TODO: I think that distinguishing between complex & simple filters is the key.
+     * Simple filters don't need variables, complex ones however do.
+     *
+     * @param filterWrappers
+     * @param editInfo
+     */
 
     public void populateFilters(final List<FilterWrapper> filterWrappers, final EditInfo editInfo) {
         this.filters.clear();
@@ -109,5 +116,9 @@ public class FilterManager {
 
     public List<Filter> getAudioFilters() {
         return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.AUDIO).collect(Collectors.toList());
+    }
+
+    public List<Filter> getComplexVideoFilters() {
+        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.COMPLEX_VIDEO).collect(Collectors.toList());
     }
 }

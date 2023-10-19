@@ -1,0 +1,119 @@
+{
+  "source_video": "D:\\Edits\\Movies\\Whiplash\\Whiplash.2014.2160p.UHD.BluRay.x265.HDR.DD+7.1-Pahe.in.mkv",
+  "source_audio": "D:\\Edits\\Music\\Let it happen\\let_it_happen.wav",
+  "peak_threshold": 0.33,
+  "ms_threshold": 600.0,
+  "working_path": "D:\\Edits\\Edits\\Whiplash let it happen\\editor_out",
+  "output_path": "D:\\Edits\\Edits\\Whiplash let it happen\\Whiplash.2014.2160p.UHD.BluRay.x265.HDR.DD+7.1-Pahe.in.mp4",
+  "editor_state": {
+    "intro_start": -1,
+    "intro_end": -1,
+    "time_stamps": [
+      450407999,
+      386760999,
+      2771394000,
+      489948000,
+      798381000,
+      1963253000,
+      1503293000,
+      136970000,
+      202619000,
+      571988000,
+      586127000,
+      1059767000,
+      1862610999,
+      1904110999,
+      2541748000,
+      2882171000,
+      3192981000,
+      3168082000,
+      3179009000,
+      3173379000,
+      3232270999,
+      3615569999,
+      3671042000,
+      4184971999,
+      4008546000,
+      4031944999,
+      5538992000,
+      5770223000,
+      5775103000,
+      5807593000,
+      5857934999,
+      5860688000,
+      6094380000,
+      6099634999
+    ],
+    "beat_times": [
+      1550.0,
+      602.5,
+      602.5,
+      602.5,
+      602.5,
+      590.0,
+      590.0,
+      590.0,
+      598.0,
+      598.0,
+      598.0,
+      598.0,
+      598.0,
+      596.6666666666661,
+      596.6666666666661,
+      596.6666666666679,
+      584.9999999999982,
+      585.0000000000018,
+      620.0,
+      590.0,
+      590.0,
+      595.0,
+      595.0,
+      596.6666666666679,
+      596.6666666666679,
+      596.6666666666642,
+      596.6666666666679,
+      596.6666666666679,
+      596.6666666666642,
+      600.0,
+      600.0,
+      596.6666666666679,
+      596.6666666666679,
+      596.6666666666642,
+      590.0,
+      589.9999999999964,
+      590.0000000000036,
+      620.0
+    ],
+    "editing_flags": {
+      "WRITE_HDR_OPTIONS": true,
+      "BEST_QUALITY": false,
+      "SHUFFLE_SEQUENCES": false,
+      "PRINT_DEBUG": true,
+      "OFFSET_AUDIO_FOR_INTRO": false
+    },
+    "filters": [
+      {
+        "name": "fade_audio_in",
+        "values": {
+          "fadeDuration": "4"
+        }
+      },
+      {
+        "name": "fade_audio_out",
+        "values": {
+          "fadeDuration": "4"
+        }
+      },
+      {
+        "name": "fade_video_out",
+        "values": {
+          "fadeDuration": "4"
+        }
+      },
+      {
+        "name": "map_hrd_content",
+        "values": {}
+      }
+    ]
+  }
+}

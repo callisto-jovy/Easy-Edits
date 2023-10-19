@@ -2,7 +2,7 @@
   "name": "fade_audio_out",
   "display_name": "Fade audio out",
   "description": "Fades out the audio at the end of the edit.",
-  "type": "AUDIO",
+  "type": "COMPLEX_AUDIO",
   "command": "afade=t=out:st=$fadeStart$us:d=$fadeDuration$",
   "settings": [
     {
