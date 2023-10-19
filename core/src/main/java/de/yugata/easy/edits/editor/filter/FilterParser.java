@@ -24,7 +24,7 @@ public class FilterParser {
     private final EditInfo editInfo;
 
 
-    public FilterParser(EditInfo editInfo) {
+    public FilterParser(final EditInfo editInfo) {
         this.editInfo = editInfo;
     }
 

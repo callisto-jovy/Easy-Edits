@@ -1,7 +1,6 @@
 package de.yugata.easy.edits.util;
 
 
-import de.yugata.easy.edits.editor.EditInfo;
 import de.yugata.easy.edits.editor.EditingFlag;
 import de.yugata.easy.edits.editor.filter.Filter;
 import de.yugata.easy.edits.editor.filter.FilterManager;
@@ -22,12 +21,31 @@ import java.util.List;
 public class FFmpegUtil {
 
     public static final File RESOURCE_DIRECTORY = new File("editor_resources");
+    public static final String LATEST_FFMPEG = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
 
     static {
         if (!RESOURCE_DIRECTORY.exists()) {
             RESOURCE_DIRECTORY.mkdir();
         }
+
+        loadFFmpeg();
     }
+
+
+    // private constructor to restrict object creation
+    private FFmpegUtil() {
+
+    }
+
+
+    public static void loadFFmpeg() {
+        try {
+            FileUtils.copyURLToFile(new URL(LATEST_FFMPEG), new File(RESOURCE_DIRECTORY, LATEST_FFMPEG));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 
     /**
      * Attempts to download a font file into the resource directory.
@@ -161,8 +179,9 @@ public class FFmpegUtil {
         return recorder;
     }
 
+
     /**
-     * Chains a list of {@link Filter} together.
+     * Chains a list of simple {@link Filter} together.
      * Will add an [in] and [out], as well as passthroughs to all the intermediary filters.
      * sample chaining result: <br>
      * [in]fade=t=in:st=0:d=120ms[f0]; [f0]curves=preset=medium_contrast[c0]; [c0]curves=preset=lighter[c1]; [c1]curves=all='0/0 0.5/0.4 1/1'[out]
@@ -170,30 +189,51 @@ public class FFmpegUtil {
      * @param filters list of filters to chain.
      * @return all chained filters in one string.
      */
-    private static String chainFilters(final List<Filter> filters) {
+    private static String chainSimpleFilters(final List<Filter> filters) {
         if (filters.isEmpty()) return null;
         final StringBuilder chainedFilters = new StringBuilder();
 
         // Add in to first filter...
         chainedFilters.append("[in]");
 
+
+        // Append destination for the last filter in the chain
+        chainedFilters.append("[out]");
+
+        return chainedFilters.toString();
+    }
+
+    /**
+     * Chains a list of {@link Filter} together.
+     *
+     * @param filters list of filters to chain.
+     * @param builder the initial {@link StringBuilder}. if left null an empty builder.
+     * @return a {@link StringBuilder} that might be manipulated further.
+     */
+    private static StringBuilder chainFilters(final List<Filter> filters, StringBuilder builder) {
+        if (filters.isEmpty())
+            return new StringBuilder();
+
+        if (builder == null)
+            builder = new StringBuilder();
+
         for (int i = 0; i < filters.size(); i++) {
             final Filter videoFilter = filters.get(i);
 
             // Only add if the filter is not the first in the list.
             if (i > 0) {
-                chainedFilters
+                builder
                         .append("[f")
                         .append((i - 1))
                         .append("]");
             }
             // append the filter
-            chainedFilters
+            builder
                     .append(videoFilter.getFilter());
 
             // Append output if this filter is not the last one
             if (i < filters.size() - 1) {
-                chainedFilters
+                builder
                         .append("[f")
                         .append(i)
                         .append("]")
@@ -201,61 +241,100 @@ public class FFmpegUtil {
                 // --> [f i]; so that in the next iteration this will be the input.
             }
         }
-        // Append destination for the last filter in the chain
-        chainedFilters.append("[out]");
 
+        return builder;
+    }
+
+
+    /**
+     * TODO: This will be a massive fucking pain in the ass...
+     * The filters will have to be "re-parsed", to set certain variables which are only clear from the number of segments that are available
+     * & the filter's position in the filter chain...
+     * fuck me, we also need to know the offset, so somehow, we need to read the segment & apply the filters...
+     * this would be so much easier with javacv, but certain filters are not there, which are really needed...
+     * I will figure this out somehow...
+     * Maybe concat two videos, then the next, etc. in that case, the offset will always be 0.
+     * Or maybe, there are no fade transitions...
+     * and variables such as offset are not possible for this project
+     * idk man
+     *
+     * @param segments
+     * @return
+     */
+    public static String chainComplexFilters(final int segments) {
+        final List<Filter> videoFilters = FilterManager.FILTER_MANAGER.getComplexVideoFilters();
+        final List<Filter> audioFilters = FilterManager.FILTER_MANAGER.getComplexAudioFilters();
+
+        final StringBuilder chainedFilters = new StringBuilder();
+
+        if (videoFilters.isEmpty() && audioFilters.isEmpty()) {
+            // prepare inputs for concat
+            for (int i = 0; i < segments; i++) {
+                chainedFilters.append("[").append(i).append(":v]");
+            }
+            return chainedFilters.toString();
+
+            // --> [v0][v1][v2]...[vn] inputs to concat.
+        }
+
+
+        for (int i = 0; i < segments; i++) {
+
+            // Video input for filter (x...)
+            // [n:v] input
+            chainedFilters.append("[").append(i).append(":v]");
+            chainFilters(videoFilters, chainedFilters);
+            // output [vn];
+            chainedFilters
+                    .append("[")
+                    .append("v")
+                    .append(i)
+                    .append("]")
+                    .append(";");
+        }
+
+        if (!audioFilters.isEmpty()) {
+            // Audio is a bit easier...
+
+            // Add audio in, we only have one audio-source
+            // The audio in is the last input
+            chainedFilters.append("[").append(segments).append(":a]");
+
+            chainFilters(audioFilters, chainedFilters);
+
+            chainedFilters.append("[a0]; [a0]");
+        }
+
+
+        // prepare inputs for concat
+        for (int i = 0; i < segments; i++) {
+            chainedFilters.append("[v").append(i).append("]");
+        }
+
+        // --> [v0][v1][v2]...[vn] inputs to concat.
         return chainedFilters.toString();
     }
 
 
-    public static FFmpegFrameFilter populateTransitionFilters(EditInfo editInfo) throws FFmpegFrameFilter.Exception {
-        final List<Filter> filters = FilterManager.FILTER_MANAGER.getTransitions();
-
-        if (filters.isEmpty())
-            return null;
-
-        final String chained = chainFilters(filters);
-
-
-        final FFmpegFrameFilter transitionFilter = new FFmpegFrameFilter(chained, editInfo.getImageWidth(), editInfo.getImageHeight());
-        transitionFilter.setPixelFormat(editInfo.getPixelFormat());
-        transitionFilter.setFrameRate(editInfo.getFrameRate());
-        transitionFilter.start();
-
-        return transitionFilter;
-    }
-
-
-    public static FFmpegFrameFilter populateAudioFilters() throws FFmpegFrameFilter.Exception {
+    public static String chainAudioFilters() {
         final List<Filter> filters = FilterManager.FILTER_MANAGER.getAudioFilters();
 
         if (filters.isEmpty())
             return null;
 
-        final String chained = chainFilters(filters);
-
-        final FFmpegFrameFilter audioFilter = new FFmpegFrameFilter(chained, 2);
-        audioFilter.start();
-
-        return audioFilter;
+        final String chained = chainSimpleFilters(filters);
+        return chained;
     }
 
 
-    public static FFmpegFrameFilter populateVideoFilters(final EditInfo editInfo) throws FFmpegFrameFilter.Exception {
+    public static String chainVideoFilters() {
         final List<Filter> filters = FilterManager.FILTER_MANAGER.getVideoFilters();
 
         if (filters.isEmpty())
             return null;
 
-        final String chained = chainFilters(filters);
-
-        final FFmpegFrameFilter videoFilter = new FFmpegFrameFilter(chained, editInfo.getImageWidth(), editInfo.getImageHeight());
-        videoFilter.setPixelFormat(editInfo.getPixelFormat());
-        videoFilter.setFrameRate(editInfo.getFrameRate());
-        videoFilter.setVideoInputs(1);
-        videoFilter.start();
-
-        return videoFilter;
+        final String chained = chainSimpleFilters(filters);
+        return chained;
     }
 
 }
