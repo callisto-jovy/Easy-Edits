@@ -5,6 +5,7 @@ import de.yugata.easy.edits.editor.EditInfo;
 import de.yugata.easy.edits.editor.EditingFlag;
 import de.yugata.easy.edits.editor.filter.Filter;
 import de.yugata.easy.edits.editor.filter.FilterManager;
+import de.yugata.easy.edits.editor.filter.FilterType;
 import org.apache.commons.io.FileUtils;
 import org.bytedeco.ffmpeg.global.avcodec;
 import org.bytedeco.ffmpeg.global.avutil;
@@ -132,7 +133,7 @@ public class FFmpegUtil {
         }
 
         if (editingFlags.contains(EditingFlag.BEST_QUALITY)) {
-            recorder.setVideoQuality(EditingFlag.BEST_QUALITY.getSetting()); // best quality --> Produces big files
+            recorder.setVideoQuality(12); // best quality --> Produces big files
             recorder.setVideoOption("cq", "12");
             recorder.setOption("preset", "slow");
             recorder.setVideoOption("profile", "main10");
@@ -208,26 +209,31 @@ public class FFmpegUtil {
     }
 
 
-    public static FFmpegFrameFilter populateTransitionFilters(EditInfo editInfo) throws FFmpegFrameFilter.Exception {
-        final List<Filter> filters = FilterManager.FILTER_MANAGER.getTransitions();
-
+    public static FFmpegFrameFilter populateVideoFilters(final List<Filter> filters, final EditInfo editInfo) throws FFmpegFrameFilter.Exception {
         if (filters.isEmpty())
             return null;
 
         final String chained = chainFilters(filters);
 
 
-        final FFmpegFrameFilter transitionFilter = new FFmpegFrameFilter(chained, editInfo.getImageWidth(), editInfo.getImageHeight());
-        transitionFilter.setPixelFormat(editInfo.getPixelFormat());
-        transitionFilter.setFrameRate(editInfo.getFrameRate());
-        transitionFilter.start();
+        final FFmpegFrameFilter filter = new FFmpegFrameFilter(chained, editInfo.getImageWidth(), editInfo.getImageHeight());
+        filter.setPixelFormat(editInfo.getPixelFormat());
+        filter.setFrameRate(editInfo.getFrameRate());
+        filter.start();
 
-        return transitionFilter;
+        return filter;
+    }
+
+
+    public static FFmpegFrameFilter populateTransitionFilters(EditInfo editInfo) throws FFmpegFrameFilter.Exception {
+        final List<Filter> filters = FilterManager.FILTER_MANAGER.getFilters(filter -> filter.getFilterType() == FilterType.TRANSITION);
+
+        return populateVideoFilters(filters, editInfo);
     }
 
 
     public static FFmpegFrameFilter populateAudioFilters() throws FFmpegFrameFilter.Exception {
-        final List<Filter> filters = FilterManager.FILTER_MANAGER.getAudioFilters();
+        final List<Filter> filters = FilterManager.FILTER_MANAGER.getFilters(filter -> filter.getFilterType() == FilterType.AUDIO);
 
         if (filters.isEmpty())
             return null;
@@ -242,20 +248,9 @@ public class FFmpegUtil {
 
 
     public static FFmpegFrameFilter populateVideoFilters(final EditInfo editInfo) throws FFmpegFrameFilter.Exception {
-        final List<Filter> filters = FilterManager.FILTER_MANAGER.getVideoFilters();
+        final List<Filter> filters = FilterManager.FILTER_MANAGER.getFilters(filter -> filter.getFilterType() == FilterType.VIDEO);
 
-        if (filters.isEmpty())
-            return null;
-
-        final String chained = chainFilters(filters);
-
-        final FFmpegFrameFilter videoFilter = new FFmpegFrameFilter(chained, editInfo.getImageWidth(), editInfo.getImageHeight());
-        videoFilter.setPixelFormat(editInfo.getPixelFormat());
-        videoFilter.setFrameRate(editInfo.getFrameRate());
-        videoFilter.setVideoInputs(1);
-        videoFilter.start();
-
-        return videoFilter;
+        return populateVideoFilters(filters, editInfo);
     }
 
 }

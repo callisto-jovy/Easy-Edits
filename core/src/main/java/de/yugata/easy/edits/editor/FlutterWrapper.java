@@ -5,7 +5,10 @@ import de.yugata.easy.edits.editor.filter.FilterType;
 import de.yugata.easy.edits.editor.filter.FilterValue;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static de.yugata.easy.edits.editor.filter.FilterManager.FILTER_MANAGER;
 
@@ -16,21 +19,22 @@ public class FlutterWrapper {
         return FILTER_MANAGER.getAvailableFilters();
     }
 
+    public static Map<String, String> getEditingFlags() {
+        return Arrays.stream(EditingFlag.values()).collect(Collectors.groupingBy(Enum::name, Collectors.mapping(EditingFlag::getDescription, Collectors.joining())));
+    }
+
     public static void exportSegments(final String json) {
         final VideoEditor videoEditor = new VideoEditorBuilder()
                 .fromJson(json);
 
-        final List<File> rawSegments = videoEditor.writeSegments();
-        videoEditor.processSegments(rawSegments); // ignore the result
+        videoEditor.writeSegments();
     }
 
     public static void edit(final String json) {
         final VideoEditor videoEditor = new VideoEditorBuilder()
                 .fromJson(json);
 
-        final List<File> rawSegments = videoEditor.writeSegments();
-        final List<File> processedSegments = videoEditor.processSegments(rawSegments);
-        videoEditor.concatSegments(processedSegments); // Concat processed segments.
+        videoEditor.edit(false);
     }
 
     /**
