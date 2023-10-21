@@ -243,6 +243,64 @@ public class VideoEditor {
 
     private void recordAudio(final FFmpegFrameGrabber audioGrabber, final FFmpegFrameRecorder recorder) throws FrameFilter.Exception, FFmpegFrameGrabber.Exception, FFmpegFrameRecorder.Exception {
         final FFmpegFrameFilter simpleAudioFiler = FFmpegUtil.populateAudioFilters();
+        final FFmpegFrameFilter overlayFilter = new FFmpegFrameFilter("[0:a][1:a]amix=inputs=2[a]", 2);
+        overlayFilter.setAudioInputs(2);
+        overlayFilter.start();
+
+        //TODO: Filter helper method: pushOrRecord, for nullable filters
+
+        // Mix audio into the intro, applying the filters.
+        // For the entirety of the intro, underlay the audio. After that, just continue recording normally.
+        if (!editingFlags.contains(EditingFlag.OFFSET_AUDIO_FOR_INTRO) && introStart != -1 && introEnd != -1) {
+            // Move to the intro start
+            this.videoGrabber.setTimestamp(introStart);
+
+            // Grab the samples and push them to 0
+            Frame introFrame;
+            while ((introFrame = videoGrabber.grabSamples()) != null && videoGrabber.getTimestamp() < introEnd) {
+                // Push 01 to frame filter
+                overlayFilter.push(0, introFrame);
+                System.out.println("pushing to overlay");
+            }
+
+            // For the same amount of time, grab the audio frames & push them
+            // First, push them through the simple audio filter
+            final long introLength = introEnd - introStart;
+            Frame audioFrame;
+            while ((audioFrame = audioGrabber.grab()) != null && audioGrabber.getTimestamp() < introLength) {
+                System.out.println("audio timestamps");
+
+                // Just push if no filter(s) are present
+                if (simpleAudioFiler == null) {
+                    overlayFilter.push(1, audioFrame);
+                    continue;
+                }
+
+                System.out.println("pushing to audio filter(s)");
+                // Push to the audio filter chain.
+                simpleAudioFiler.push(audioFrame);
+
+                // Pull & push to 1
+                while ((audioFrame = simpleAudioFiler.pull()) != null) {
+                    overlayFilter.push(1, audioFrame);
+                }
+            }
+
+            // Pull from the overlay filter & record.
+            Frame overlayFrame;
+            while ((overlayFrame = overlayFilter.pull()) != null) {
+                // Set the timestamp in the recorder.
+                System.out.println("recording to overlay");
+                recorder.setTimestamp(audioGrabber.getTimestamp());
+                recorder.record(overlayFrame);
+            }
+        }
+
+
+        // after the optional intro grabbing, the frame grabber has either moved or not.
+        // if not, we just keep recording.
+
+
 
         /* Audio frame grabbing */
         Frame audioFrame;
@@ -250,12 +308,11 @@ public class VideoEditor {
 
             // offset the audio timestamp by the intro start, so that the intro keeps its original audio if that's requested.
             // this then can be paired with a slow fade in of x seconds for the intro
-            if (editingFlags.contains(EditingFlag.OFFSET_AUDIO_FOR_INTRO)) {
-                recorder.setTimestamp(introStart == -1 ? audioFrame.timestamp : introStart + audioFrame.timestamp);
+            if (editingFlags.contains(EditingFlag.OFFSET_AUDIO_FOR_INTRO) && introStart != -1) {
+                recorder.setTimestamp(introStart + audioGrabber.getTimestamp());
             } else {
-                recorder.setTimestamp(audioFrame.timestamp);
+              //  recorder.setTimestamp(audioGrabber.getTimestamp());
             }
-
 
             if (simpleAudioFiler == null) {
                 recorder.record(audioFrame);
@@ -273,6 +330,8 @@ public class VideoEditor {
         /* Clean up resources */
         if (simpleAudioFiler != null)
             simpleAudioFiler.close();
+
+        overlayFilter.close();
     }
 
 
