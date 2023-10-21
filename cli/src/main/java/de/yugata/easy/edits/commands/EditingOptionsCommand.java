@@ -27,11 +27,6 @@ public class EditingOptionsCommand {
                 .description("Set a flag for rendering the edit.")
                 .and()
                 .withOption()
-                .longNames("value")
-                .type(Integer.class)
-                .description("Set the flag's value if possible.")
-                .and()
-                .withOption()
                 .longNames("see")
                 .description("Prints the state of all the editing flags.")
                 .and()
@@ -46,16 +41,8 @@ public class EditingOptionsCommand {
                     if (ctx.hasMappedOption("set")) {
                         final String set = ctx.getOptionValue("set");
 
-                        if (ctx.hasMappedOption("value")) {
-                            final int value = ctx.getOptionValue("value");
-
-                            EditingFlag.valueOf(set).setSetting(value);
-                            return String.format("Set flag %s to value %d", set, value);
-                        } else {
-                            Editor.INSTANCE.addOrRemoveFlag(EditingFlag.valueOf(set));
-                            return String.format("Added flag %s to existing flags!", set);
-                        }
-
+                        Editor.INSTANCE.addOrRemoveFlag(EditingFlag.valueOf(set));
+                        return String.format("Added flag %s to existing flags!", set);
                     } else if (ctx.hasMappedOption("see")) {
                         return formatFlags(Editor.INSTANCE.getEditingFlags().stream());
                     } else if (ctx.hasMappedOption("all")) {
@@ -74,7 +61,7 @@ public class EditingOptionsCommand {
     }
 
     private String formatFlag(final EditingFlag flag) {
-        return String.format("%s : %s : Value: %d", flag.name(), flag.getDescription(), flag.getSetting());
+        return String.format("%s : %s", flag.name(), flag.getDescription());
     }
 
 }
