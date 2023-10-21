@@ -118,7 +118,8 @@ public class FilterManager {
         return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.AUDIO).collect(Collectors.toList());
     }
 
-    public List<Filter> getComplexVideoFilters() {
-        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.COMPLEX_VIDEO).collect(Collectors.toList());
+
+    public List<Filter> getTransitions() {
+        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.TRANSITION).collect(Collectors.toList());
     }
 }

@@ -1,15 +1,9 @@
 package de.yugata.easy.edits.editor;
 
 
-import com.github.kokorin.jaffree.LogLevel;
-import com.github.kokorin.jaffree.StreamType;
-import com.github.kokorin.jaffree.ffmpeg.*;
-import de.yugata.easy.edits.editor.filter.Filter;
 import de.yugata.easy.edits.editor.filter.FilterManager;
 import de.yugata.easy.edits.editor.filter.FilterWrapper;
-import de.yugata.easy.edits.util.AudioUtil;
 import de.yugata.easy.edits.util.FFmpegUtil;
-import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.*;
 
 import java.io.File;
@@ -17,7 +11,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static de.yugata.easy.edits.util.FFmpegUtil.FFMPEG_BIN;
 import static org.bytedeco.ffmpeg.global.avutil.AV_LOG_VERBOSE;
 import static org.bytedeco.ffmpeg.global.avutil.av_log_set_level;
 
@@ -52,7 +45,7 @@ public class VideoEditor {
 
     private final List<FilterWrapper> filters;
 
-    private final File outputFile, workingDirectory, outputDirectory;
+    private final File outputFile, workingDirectory;
 
 
     public VideoEditor(final String videoPath,
@@ -85,11 +78,6 @@ public class VideoEditor {
         } else {
             this.outputFile = outputFile;
         }
-
-        this.outputDirectory = new File(workingDirectory.getParent(), "output");
-
-        if (!outputDirectory.exists())
-            outputDirectory.mkdirs();
 
 
         if (flags.contains(EditingFlag.PRINT_DEBUG)) {
@@ -131,162 +119,161 @@ public class VideoEditor {
         }
     }
 
+    private List<File> collectSegments(final boolean useSegments) {
+        if (useSegments) {
+            return Arrays.stream(workingDirectory.listFiles())
+                    .sorted(Comparator.comparingInt(value -> Integer.parseInt(value.getName().substring("segment ".length(), value.getName().lastIndexOf(".")))))
+                    .collect(Collectors.toList());
 
-    public List<File> collectSegments() {
-        return Arrays.stream(Objects.requireNonNull(workingDirectory.listFiles()))
-                .sorted(Comparator.comparingInt(value -> Integer.parseInt(value.getName().substring("segment ".length(), value.getName().lastIndexOf(".")))))
-                .collect(Collectors.toList());
+        } else {
+            return writeSegments();
+        }
     }
 
-    public List<File> collectProcessedSegments() {
-        return Arrays.stream(Objects.requireNonNull(outputDirectory.listFiles()))
-                .sorted(Comparator.comparingInt(value -> Integer.parseInt(value.getName().substring("segment ".length(), value.getName().lastIndexOf(".")))))
-                .collect(Collectors.toList());
-    }
+
+    public void edit(final boolean useSegments) {
+        // Write the segment files that will be stitched together.
+        final List<File> segments = collectSegments(useSegments);
+
+        this.initFrameGrabber();
+
+        // Recorder for the final product & audio grabber to overlay the audio
+        try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath);
+             final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(outputFile, editingFlags, videoGrabber)) {
+
+            // Start grabbing the audio, we need this for the sample rate.
+            audioGrabber.start();
+            recorder.start();
 
 
-    public List<File> processSegments(final List<File> segments) {
-        final List<File> files = new ArrayList<>();
+            /* Add the intro in front */
 
-        for (final File segment : segments) {
-            final FFmpeg builder = FFmpeg.atPath(FFMPEG_BIN.toPath());
+            if (introStart != -1 && introEnd != -1) {
+                this.videoGrabber.setTimestamp(introStart);
 
-            final File outputFile = new File(outputDirectory, segment.getName());
+                Frame introFrame;
+                while ((introFrame = videoGrabber.grab()) != null && videoGrabber.getTimestamp() < introEnd) {
+                    recorder.record(introFrame);
+                }
+            }
 
-            builder.addInput(UrlInput.fromPath(segment.toPath()))       // Segment is the input
-                    .addOutput(UrlOutput.toPath(outputFile.toPath())) // Output segment in output dir
-                    .setLogLevel(LogLevel.INFO)
-                    .addArguments("-c:v", "libx265")
-                    .setOverwriteOutput(true)
-                    .setOutputListener(System.out::println);
+            /* End intro */
 
 
-            // Add filters
-
-            // TODO: new data class
+            // Edit: I fucking hate this, we just pass the frame grabber in the fucking future...
             final EditInfo editInfo = new EditInfoBuilder()
-                    .setEditTime(AudioUtil.estimateEditLengthInMicros(audioPath))
+                    .setEditTime(audioGrabber.getLengthInTime())
+                    .setAudioCodec(audioGrabber.getAudioCodec())
+                    .setAspectRatio(videoGrabber.getAspectRatio())
+                    .setAudioChannels(audioGrabber.getAudioChannels())
+                    .setAudioBitrate(audioGrabber.getAudioBitrate())
+                    .setFrameRate(videoGrabber.getFrameRate())
+                    .setImageHeight(videoGrabber.getImageHeight())
+                    .setImageWidth(videoGrabber.getImageWidth())
+                    .setAudioCodecName(audioGrabber.getAudioCodecName())
+                    .setSampleFormat(audioGrabber.getSampleFormat())
+                    .setVideoBitrate(videoGrabber.getVideoBitrate())
+                    .setImageScalingFlags(videoGrabber.getImageScalingFlags())
+                    .setSampleRate(audioGrabber.getSampleRate())
+                    .setVideoCodec(videoGrabber.getVideoCodec())
+                    .setVideoCodecName(videoGrabber.getVideoCodecName())
+                    .setPixelFormat(recorder.getPixelFormat())
                     .setIntroStart(introStart)
                     .setIntroEnd(introEnd)
                     .createEditInfo();
 
+
             // Populate the filters
             FilterManager.FILTER_MANAGER.populateFilters(filters, editInfo);
 
-            /* Configure the  filters. */
-            final String videoFilter = FFmpegUtil.chainVideoFilters();
-            final String audioFilter = FFmpegUtil.chainAudioFilters();
 
-            builder.setFilter(StreamType.AUDIO, audioFilter);
-            builder.setFilter(StreamType.VIDEO, videoFilter);
+            // Configure the simple video filters.
+            final FFmpegFrameFilter simpleVideoFiler = FFmpegUtil.populateVideoFilters(editInfo);
 
-            // Execute new command
-            builder.execute();
+            /* Writing the segments to the main file, apply filters */
 
-            files.add(outputFile);
+            for (final File segment : segments) {
+                // TODO: Move to util maybe
+                final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(segment);
+                FFmpegUtil.configureGrabber(segmentGrabber);
+                segmentGrabber.setVideoCodecName("hevc_cuvid"); // HW-Accelerated grabbing
+                segmentGrabber.setPixelFormat(recorder.getPixelFormat()); // Ensure that the pixel format is right.
+                segmentGrabber.start();
+
+                // Populate the transition filters, we have to reconfigure them every time, as the offsets depend on it.
+                final FFmpegFrameFilter transitionFilter = FFmpegUtil.populateTransitionFilters(editInfo);
+
+                // Add the filters to a chain.
+                // TODO: Add to a ffmpeg chain?? Join the filters with a semicolon
+                final FFmpegFrameFilter[] filters;
+
+                if (simpleVideoFiler == null) {
+                    filters = new FFmpegFrameFilter[]{};
+                } else {
+                    filters = transitionFilter == null ? new FFmpegFrameFilter[]{simpleVideoFiler} : new FFmpegFrameFilter[]{transitionFilter, simpleVideoFiler};
+                }
+
+                // grab the frames & send them to the filters
+                Frame videoFrame;
+                while ((videoFrame = segmentGrabber.grabImage()) != null) {
+                    FFmpegUtil.pushToFilters(videoFrame, recorder, filters);
+                }
+
+                // Close the transition filter, free the resources
+                if (transitionFilter != null)
+                    transitionFilter.close();
+
+                // Close the grabber, release the resources
+                segmentGrabber.close();
+            }
+
+            /* End recording video */
+
+            /* Clean up resources */
+            if (simpleVideoFiler != null)
+                simpleVideoFiler.stop();
+
+            // Record the audio
+            this.recordAudio(audioGrabber, recorder);
+            ///////////////
+        } catch (FrameRecorder.Exception | FrameGrabber.Exception | FrameFilter.Exception e) {
+            throw new RuntimeException(e);
         }
-        return files;
+        this.releaseFrameGrabber();
     }
 
+    private void recordAudio(final FFmpegFrameGrabber audioGrabber, final FFmpegFrameRecorder recorder) throws FFmpegFrameFilter.Exception, FFmpegFrameGrabber.Exception, FFmpegFrameRecorder.Exception {
+        final FFmpegFrameFilter simpleAudioFiler = FFmpegUtil.populateAudioFilters();
 
-    public void concatSegments(final List<File> segments) {
+        /* Audio frame grabbing */
+        Frame audioFrame;
+        while ((audioFrame = audioGrabber.grab()) != null) {
 
-        // TODO: re add intro support, just export the intro segments & stich them in the front
-        final FFmpeg builder = FFmpeg.atPath(FFMPEG_BIN.toPath());
-
-        // Add input(s)
-        for (final File segment : segments) {
-            builder.addInput(UrlInput.fromPath(segment.toPath()));
-        }
-
-        // just add the output here
-        builder.addOutput(UrlOutput.toPath(outputFile.toPath()))
-                .addInput(UrlInput.fromUrl(audioPath)) // The audio input is the last input added (segments.size())
-                .setLogLevel(LogLevel.INFO)
-                .addArguments("-c:v", "libx265")
-                .setOutputListener(System.out::println);
-
-/*
-        // Add intro offset if requested
-        if (introStart != -1 && introEnd != -1) {
             // offset the audio timestamp by the intro start, so that the intro keeps its original audio if that's requested.
             // this then can be paired with a slow fade in of x seconds for the intro
             if (editingFlags.contains(EditingFlag.OFFSET_AUDIO_FOR_INTRO)) {
-                final long introLength = TimeUnit.MICROSECONDS.toMillis(introEnd - introStart);
-                builder.addArguments("-itsoffset", introLength + "ms")
-                        .addArgument("-async");
+                recorder.setTimestamp(introStart == -1 ? audioFrame.timestamp : introStart + audioFrame.timestamp);
+            } else {
+                recorder.setTimestamp(audioFrame.timestamp);
             }
 
-            //TODO Intro
-        }
- */
 
-        // Todo: maybe complex filters can be passed here.
-
-        final EditInfo editInfo = new EditInfoBuilder()
-                .setEditTime(AudioUtil.estimateEditLengthInMicros(audioPath))
-                .setIntroStart(introStart)
-                .setIntroEnd(introEnd)
-                .createEditInfo();
-
-        FilterManager.FILTER_MANAGER.populateFilters(filters, editInfo);
-
-        final List<FilterChain> filterChains = new ArrayList<>();
-
-        for (final Filter complexVideoFilter : FilterManager.FILTER_MANAGER.getComplexVideoFilters()) {
-            filterChains.add(FilterChain.of());
-        }
-        /*
-
-        // Chain filters
-
-        // split filter
-        for (final Filter complexVideoFilter : FilterManager.FILTER_MANAGER.getComplexVideoFilters()) {
-            // The chain to complete
-
-            final FilterChain filterChain = new FilterChain();
-            // the complex filter to parse
-            final String filter = complexVideoFilter.getFilter();
-
-            final String[] filters = filter.split(","); // split filter chain
-
-            // parse the string
-            if (filters.length == 0) {
-                final GenericFilter genericFilter = FFmpegUtil.parseGenericFilter(filter);
-                filterChain.addFilter(genericFilter);
+            if (simpleAudioFiler == null) {
+                recorder.record(audioFrame);
             } else {
-                for (final String f : filters) {
-                    final GenericFilter genericFilter = FFmpegUtil.parseGenericFilter(f);
-                    filterChain.addFilter(genericFilter);
+                simpleAudioFiler.push(audioFrame);
+
+                while ((audioFrame = simpleAudioFiler.pull()) != null) {
+                    recorder.record(audioFrame);
                 }
             }
-
-            // parse the multiple strings
-            filterChains.add(filterChain);
         }
 
-         */
+        /* End audio grabbing */
 
-        filterChains.add(FilterChain.of(
-                        com.github.kokorin.jaffree.ffmpeg.Filter
-                                .fromInputLink(StreamType.VIDEO)
-                                .setName("concat")
-                                .addArgument("n", String.valueOf(segments.size()))
-                                .addArgument("v", "1")
-                                .addArgument("a", "0")
-                                .addOutputLink("v")
-                )
-        );
-
-
-        builder.setComplexFilter(FilterGraph.of(filterChains.toArray(new FilterChain[]{})));
-
-
-        builder.addArguments("-map", "[v]");
-        builder.addArguments("-map", String.format("%d:a", segments.size())); //TODO: Complex audio filters
-
-        // execute, concat the segments. & add the audio
-        builder.execute();
+        /* Clean up resources */
+        if (simpleAudioFiler != null)
+            simpleAudioFiler.stop();
     }
 
 
@@ -326,6 +313,9 @@ public class VideoEditor {
                 final File segmentFile = new File(workingDirectory, String.format("segment %d.mp4", nextStamp));
                 segmentFiles.add(segmentFile); // Add the file to the segments.
                 final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(segmentFile, editingFlags, videoGrabber);
+                //        recorder.setPixelFormat(frameGrabber.getPixelFormat());
+                //    recorder.setPixelFormat(frameGrabber.getPixelFormat());
+                //   recorder.setVideoCodec(AV_CODEC_ID_H265);
 
                 recorder.start();
 
@@ -348,15 +338,12 @@ public class VideoEditor {
             }
             /* End beat loop */
 
+            this.releaseFrameGrabber();
 
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
-        this.releaseFrameGrabber();
-
         return segmentFiles;
     }
-
-
 }

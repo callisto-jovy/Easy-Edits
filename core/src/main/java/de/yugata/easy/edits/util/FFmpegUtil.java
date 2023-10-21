@@ -1,8 +1,7 @@
 package de.yugata.easy.edits.util;
 
 
-import com.github.kokorin.jaffree.ffmpeg.FilterChain;
-import com.github.kokorin.jaffree.ffmpeg.GenericFilter;
+import de.yugata.easy.edits.editor.EditInfo;
 import de.yugata.easy.edits.editor.EditingFlag;
 import de.yugata.easy.edits.editor.filter.Filter;
 import de.yugata.easy.edits.editor.filter.FilterManager;
@@ -12,16 +11,10 @@ import org.bytedeco.ffmpeg.global.avutil;
 import org.bytedeco.javacv.*;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
-import java.nio.channels.Channels;
-import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 /**
  * TODO: This needs some documentation, not only for other, but also for myself.
@@ -30,52 +23,11 @@ public class FFmpegUtil {
 
     public static final File RESOURCE_DIRECTORY = new File("editor_resources");
 
-    public static final File FFMPEG_BIN = new File(RESOURCE_DIRECTORY, "ffmpeg_bin");
-
-    public static final String LATEST_FFMPEG = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
-
     static {
         if (!RESOURCE_DIRECTORY.exists()) {
             RESOURCE_DIRECTORY.mkdir();
         }
-
-        if (!FFMPEG_BIN.exists()) {
-            FFMPEG_BIN.mkdirs();
-        }
-
-        loadFFmpeg();
     }
-
-
-    // private constructor to restrict object creation
-    private FFmpegUtil() {
-
-    }
-
-
-    public static void loadFFmpeg() {
-        // TODO: Versioning, editor_resources should have a file with the latest auto build version.
-        // Or: timer that loads the new version every month / week
-
-        if (FFMPEG_BIN.length() > 0)
-            return;
-
-        System.out.println("Downloading latest FFMPEG.");
-
-        final File output = new File(FFMPEG_BIN, "ffmpeg.zip");
-
-        try {
-            FileUtils.copyURLToFile(new URL(LATEST_FFMPEG), output);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        // Extract zip
-        unzipFFmpeg(output, FFMPEG_BIN);
-
-        // Delete zip
-        output.delete();
-    }
-
 
     /**
      * Attempts to download a font file into the resource directory.
@@ -209,9 +161,8 @@ public class FFmpegUtil {
         return recorder;
     }
 
-
     /**
-     * Chains a list of simple {@link Filter} together.
+     * Chains a list of {@link Filter} together.
      * Will add an [in] and [out], as well as passthroughs to all the intermediary filters.
      * sample chaining result: <br>
      * [in]fade=t=in:st=0:d=120ms[f0]; [f0]curves=preset=medium_contrast[c0]; [c0]curves=preset=lighter[c1]; [c1]curves=all='0/0 0.5/0.4 1/1'[out]
@@ -219,52 +170,30 @@ public class FFmpegUtil {
      * @param filters list of filters to chain.
      * @return all chained filters in one string.
      */
-    private static String chainSimpleFilters(final List<Filter> filters) {
+    private static String chainFilters(final List<Filter> filters) {
         if (filters.isEmpty()) return null;
         final StringBuilder chainedFilters = new StringBuilder();
 
         // Add in to first filter...
         chainedFilters.append("[in]");
 
-        chainFilters(filters, chainedFilters);
-
-        // Append destination for the last filter in the chain
-        chainedFilters.append("[out]");
-
-        return chainedFilters.toString();
-    }
-
-    /**
-     * Chains a list of {@link Filter} together.
-     *
-     * @param filters list of filters to chain.
-     * @param builder the initial {@link StringBuilder}. if left null an empty builder.
-     * @return a {@link StringBuilder} that might be manipulated further.
-     */
-    private static StringBuilder chainFilters(final List<Filter> filters, StringBuilder builder) {
-        if (filters.isEmpty())
-            return new StringBuilder();
-
-        if (builder == null)
-            builder = new StringBuilder();
-
         for (int i = 0; i < filters.size(); i++) {
             final Filter videoFilter = filters.get(i);
 
             // Only add if the filter is not the first in the list.
             if (i > 0) {
-                builder
+                chainedFilters
                         .append("[f")
                         .append((i - 1))
                         .append("]");
             }
             // append the filter
-            builder
+            chainedFilters
                     .append(videoFilter.getFilter());
 
             // Append output if this filter is not the last one
             if (i < filters.size() - 1) {
-                builder
+                chainedFilters
                         .append("[f")
                         .append(i)
                         .append("]")
@@ -272,256 +201,61 @@ public class FFmpegUtil {
                 // --> [f i]; so that in the next iteration this will be the input.
             }
         }
+        // Append destination for the last filter in the chain
+        chainedFilters.append("[out]");
 
-        return builder;
+        return chainedFilters.toString();
     }
 
-    public static String chainAudioFilters() {
+
+    public static FFmpegFrameFilter populateTransitionFilters(EditInfo editInfo) throws FFmpegFrameFilter.Exception {
+        final List<Filter> filters = FilterManager.FILTER_MANAGER.getTransitions();
+
+        if (filters.isEmpty())
+            return null;
+
+        final String chained = chainFilters(filters);
+
+
+        final FFmpegFrameFilter transitionFilter = new FFmpegFrameFilter(chained, editInfo.getImageWidth(), editInfo.getImageHeight());
+        transitionFilter.setPixelFormat(editInfo.getPixelFormat());
+        transitionFilter.setFrameRate(editInfo.getFrameRate());
+        transitionFilter.start();
+
+        return transitionFilter;
+    }
+
+
+    public static FFmpegFrameFilter populateAudioFilters() throws FFmpegFrameFilter.Exception {
         final List<Filter> filters = FilterManager.FILTER_MANAGER.getAudioFilters();
 
         if (filters.isEmpty())
             return null;
 
-        return chainSimpleFilters(filters);
+        final String chained = chainFilters(filters);
+
+        final FFmpegFrameFilter audioFilter = new FFmpegFrameFilter(chained, 2);
+        audioFilter.start();
+
+        return audioFilter;
     }
 
 
-    public static String chainVideoFilters() {
+    public static FFmpegFrameFilter populateVideoFilters(final EditInfo editInfo) throws FFmpegFrameFilter.Exception {
         final List<Filter> filters = FilterManager.FILTER_MANAGER.getVideoFilters();
 
         if (filters.isEmpty())
             return null;
 
-        return chainSimpleFilters(filters);
+        final String chained = chainFilters(filters);
+
+        final FFmpegFrameFilter videoFilter = new FFmpegFrameFilter(chained, editInfo.getImageWidth(), editInfo.getImageHeight());
+        videoFilter.setPixelFormat(editInfo.getPixelFormat());
+        videoFilter.setFrameRate(editInfo.getFrameRate());
+        videoFilter.setVideoInputs(1);
+        videoFilter.start();
+
+        return videoFilter;
     }
 
-    /**
-     * TODO: This will be a massive fucking pain in the ass...
-     * The filters will have to be "re-parsed", to set certain variables which are only clear from the number of segments that are available
-     * & the filter's position in the filter chain...
-     * fuck me, we also need to know the offset, so somehow, we need to read the segment & apply the filters...
-     * this would be so much easier with javacv, but certain filters are not there, which are really needed...
-     * I will figure this out somehow...
-     * Maybe concat two videos, then the next, etc. in that case, the offset will always be 0.
-     * Or maybe, there are no fade transitions...
-     * and variables such as offset are not possible for this project
-     * idk man
-     *
-     * @param segments
-     * @return
-     */
-    public static String chainComplexFilters(final int segments) {
-        final List<Filter> videoFilters = FilterManager.FILTER_MANAGER.getComplexVideoFilters();
-
-        final StringBuilder chainedFilters = new StringBuilder();
-
-        if (videoFilters.isEmpty()) {
-            // prepare inputs for concat
-            for (int i = 0; i < segments; i++) {
-                chainedFilters.append("[").append(i).append(":v]");
-            }
-            return chainedFilters.toString();
-
-            // --> [v0][v1][v2]...[vn] inputs to concat.
-        }
-
-
-        for (int i = 0; i < segments; i++) {
-
-            // Video input for filter (x...)
-            // [n:v] input
-            chainedFilters.append("[").append(i).append(":v]");
-            chainFilters(videoFilters, chainedFilters);
-            // output [vn];
-            chainedFilters
-                    .append("[")
-                    .append("v")
-                    .append(i)
-                    .append("]")
-                    .append(";");
-        }
-
-        // prepare inputs for concat
-        for (int i = 0; i < segments; i++) {
-            chainedFilters.append("[v").append(i).append("]");
-        }
-
-        // --> [v0][v1][v2]...[vn] inputs to concat.
-        return chainedFilters.toString();
-    }
-
-
-    private static void unzipFFmpeg(final File zip, final File dest) {
-        FileInputStream fis;
-        try {
-            fis = new FileInputStream(zip);
-            final ZipInputStream zis = new ZipInputStream(fis);
-
-            ZipEntry zipEntry;
-
-            while ((zipEntry = zis.getNextEntry()) != null) {
-                // Skip subdirectories, we want all files in one place.
-                if (zipEntry.isDirectory()) {
-                    System.out.println(zipEntry.getName() + "is directory, skipping.");
-                    continue;
-                }
-
-                // name includes the path, so we have to strip it.
-                final String name = zipEntry.getName().substring(zipEntry.getName().lastIndexOf('/') + 1);
-
-                final File newFile = new File(dest, name);
-                System.out.println("Unzipping to " + newFile.getAbsolutePath());
-
-                // Transfer data using channels
-
-                final FileOutputStream fos = new FileOutputStream(newFile);
-                fos.getChannel().transferFrom(Channels.newChannel(zis), 0, Long.MAX_VALUE);
-                fos.close();
-
-                //close this ZipEntry
-                zis.closeEntry();
-            }
-            //close last ZipEntry
-            zis.closeEntry();
-            zis.close();
-            fis.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-
-    public static FilterChain parseFilterChain(final String filterChain) {
-        final List<GenericFilter> chain = new ArrayList<>();
-
-        // Split this at a colon...
-
-        StringBuilder sequence = new StringBuilder();
-
-        boolean charEscaped = false, escapedSequence = false;
-
-        for (final char fChar : filterChain.toCharArray()) {
-            switch (fChar) {
-                case '"':
-                case '\'': {
-                    if (!charEscaped)
-                        escapedSequence = !escapedSequence;
-                    else
-                        charEscaped = false;
-
-                    break;
-                }
-
-                case '\\':
-                    charEscaped = true;
-                    break;
-
-                case ',': {
-
-                    if (!escapedSequence) {
-                        chain.add(parseGenericFilter(sequence.toString()));
-
-                        sequence = new StringBuilder(); // reset sequence
-                    }
-                    continue;
-                }
-
-                default:
-                    break;
-            }
-
-            sequence.append(fChar);
-        }
-
-
-        // There is more to parse...
-        if (sequence.length() > 0) {
-            chain.add(parseGenericFilter(sequence.toString()));
-        }
-
-        return new FilterChain().addFilters(chain);
-    }
-
-
-    public static GenericFilter parseGenericFilter(final String filter) {
-
-        // get the name
-        final String name = StringUtil.substringUntil(filter, "=");
-        final int nameEndIndex = filter.indexOf("=") + 1;
-
-
-        return parseFilterChars(filter.substring(nameEndIndex).toCharArray(), name);
-    }
-
-    private static GenericFilter parseFilterChars(final char[] fChars, final String filterName) {
-
-        final GenericFilter filter = com.github.kokorin.jaffree.ffmpeg.Filter
-                .withName(filterName);
-
-        final List<String> tokens = new ArrayList<>();
-
-        StringBuffer sequence = new StringBuffer();
-
-        boolean charEscaped = false, escapedSequence = false, isArguments = false;
-
-        for (final char fChar : fChars) {
-            switch (fChar) {
-                case '"':
-                case '\'': {
-                    if (!charEscaped)
-                        escapedSequence = !escapedSequence;
-                    else
-                        charEscaped = false;
-
-                    break;
-                }
-
-                case ':': {
-                    isArguments = true;
-
-
-                    // Terminates the argument anyway
-                    if (!escapedSequence) {
-                        tokens.add(sequence.toString());
-                        System.out.println(tokens);
-                        filter.addArgument(tokens.get(0), tokens.get(1));
-                        tokens.clear();
-                        sequence = new StringBuffer();
-                    }
-                    continue;
-                }
-
-
-                case '\\':
-                    charEscaped = true;
-                    break;
-
-                case '=': {
-                    // New token from the last sequence.
-                    if (!escapedSequence) {
-                        tokens.add(sequence.toString());
-                        sequence = new StringBuffer();
-                    }
-
-                    continue;
-                }
-
-                default:
-                    break;
-            }
-
-            sequence.append(fChar);
-        }
-        // Add the remaining chars to the tokens.
-        tokens.add(sequence.toString());
-
-        System.out.println(tokens);
-
-        for (String token : tokens) {
-            filter.addArgument(token);
-        }
-
-        System.out.println(filter.getValue());
-        return filter;
-    }
 }
