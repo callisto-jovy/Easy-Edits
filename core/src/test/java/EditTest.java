@@ -19,7 +19,7 @@ public class EditTest {
         final VideoEditor videoEditor = new VideoEditorBuilder()
                 .fromJson(json);
 
-        videoEditor.edit(false);
+        videoEditor.edit(true);
 
     }
 }
