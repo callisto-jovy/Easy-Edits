@@ -100,10 +100,7 @@ public class Editor {
                 .setVideoTimeStamps(new ArrayList<>(timeStamps))
                 .createVideoEditor();
 
-
-        final List<File> rawSegments = editor.writeSegments();
-        final List<File> processedSegments = editor.processSegments(rawSegments);
-        editor.concatSegments(processedSegments); // Concat processed segments.
+        editor.edit(false);
     }
 
 
