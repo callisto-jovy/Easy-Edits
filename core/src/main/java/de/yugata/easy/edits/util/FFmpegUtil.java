@@ -133,10 +133,10 @@ public class FFmpegUtil {
 
         if (editingFlags.contains(EditingFlag.BEST_QUALITY)) {
             recorder.setVideoQuality(EditingFlag.BEST_QUALITY.getSetting()); // best quality --> Produces big files
-            recorder.setVideoOption("cq", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
+            recorder.setVideoOption("cq", "12");
             recorder.setOption("preset", "slow");
             recorder.setVideoOption("profile", "main10");
-            recorder.setVideoOption("crf", String.valueOf(EditingFlag.BEST_QUALITY.getSetting()));
+            recorder.setVideoOption("crf", "12");
             recorder.setVideoOption("qmin", "0");
             recorder.setVideoOption("qmax", "0");
             recorder.setOption("tune", "hq");
