@@ -19,9 +19,7 @@ public class EditTest {
         final VideoEditor videoEditor = new VideoEditorBuilder()
                 .fromJson(json);
 
-       // final List<File> rawSegments = videoEditor.collectSegments();
-        final List<File> processedSegments = videoEditor.collectProcessedSegments();
-        videoEditor.concatSegments(processedSegments); // Concat processed segments.
+        videoEditor.edit(false);
 
     }
 }

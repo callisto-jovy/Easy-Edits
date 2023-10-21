@@ -11,6 +11,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class FilterManager {
@@ -27,7 +28,7 @@ public class FilterManager {
     }
 
     public List<FlutterWrapper.FlutterFilterWrapper> getAvailableFilters() {
-        if (!checkFilterAvailability())
+        if (areFiltersNotAvailable())
             return new ArrayList<>();
 
         final List<FlutterWrapper.FlutterFilterWrapper> availableFilters = new ArrayList<>();
@@ -63,7 +64,7 @@ public class FilterManager {
     public void populateFilters(final List<FilterWrapper> filterWrappers, final EditInfo editInfo) {
         this.filters.clear();
 
-        if (!checkFilterAvailability())
+        if (areFiltersNotAvailable())
             return;
 
         final File[] files = FILTER_DIR.listFiles();
@@ -93,33 +94,23 @@ public class FilterManager {
         }
     }
 
-    private boolean checkFilterAvailability() {
+    private boolean areFiltersNotAvailable() {
         // load the filters from the resources
         if (!FILTER_DIR.exists()) {
             System.err.println("No filter directory exists at the required position. No filters were loaded.");
-            return false;
+            return true;
         }
 
         final File[] files = FILTER_DIR.listFiles();
         if (files == null) {
             System.err.println("No files found in the filter directory. No filters were loaded.");
-            return false;
+            return true;
         }
-        return true;
+        return false;
     }
 
 
-    public List<Filter> getVideoFilters() {
-        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.VIDEO).collect(Collectors.toList());
-
-    }
-
-    public List<Filter> getAudioFilters() {
-        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.AUDIO).collect(Collectors.toList());
-    }
-
-
-    public List<Filter> getTransitions() {
-        return this.filters.stream().filter(filter -> filter.getFilterType() == FilterType.TRANSITION).collect(Collectors.toList());
+    public List<Filter> getFilters(final Predicate<Filter> filterPredicate) {
+        return  this.filters.stream().filter(filterPredicate).collect(Collectors.toList());
     }
 }

@@ -33,6 +33,7 @@ public class FilterParser {
         return Optional.ofNullable(element.get(key));
     }
 
+
     public static FlutterWrapper.FlutterFilterWrapper getFilterWrapper(final JsonElement element) throws Exception {
         if (!element.isJsonObject()) {
             throw new ParserException("Filter root object is not a json object.");
@@ -102,15 +103,21 @@ public class FilterParser {
         // Array of all the "settings", e.g. tokens that have to be resolved.
         final JsonArray settings = root.getAsJsonArray("settings");
 
+        // Where the filter is to be used in the workflow. Default: during the editing process. Other filters might need to be applied before exporting.
+
+        final String range = getOr(root, "range").map(JsonElement::getAsString).orElse(FilterRange.EDIT.name());
+        final FilterRange filterRange = FilterRange.valueOf(range);
+
+
         // Nothing to parse
         if (settings.isEmpty())
-            return new Filter(name, rawCommand, filterType);
+            return new Filter(name, rawCommand, filterType, filterRange);
 
 
         // Parse the command
         final String parsedCommand = parseCommand(filterWrapper, rawCommand, settings);
 
-        return new Filter(name, parsedCommand, filterType);
+        return new Filter(name, parsedCommand, filterType, filterRange);
     }
 
 

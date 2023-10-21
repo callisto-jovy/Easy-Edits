@@ -1,8 +1,7 @@
 package de.yugata.easy.edits.editor;
 
 
-import de.yugata.easy.edits.editor.filter.FilterManager;
-import de.yugata.easy.edits.editor.filter.FilterWrapper;
+import de.yugata.easy.edits.editor.filter.*;
 import de.yugata.easy.edits.util.FFmpegUtil;
 import org.bytedeco.javacv.*;
 
@@ -242,7 +241,7 @@ public class VideoEditor {
         this.releaseFrameGrabber();
     }
 
-    private void recordAudio(final FFmpegFrameGrabber audioGrabber, final FFmpegFrameRecorder recorder) throws FFmpegFrameFilter.Exception, FFmpegFrameGrabber.Exception, FFmpegFrameRecorder.Exception {
+    private void recordAudio(final FFmpegFrameGrabber audioGrabber, final FFmpegFrameRecorder recorder) throws FrameFilter.Exception, FFmpegFrameGrabber.Exception, FFmpegFrameRecorder.Exception {
         final FFmpegFrameFilter simpleAudioFiler = FFmpegUtil.populateAudioFilters();
 
         /* Audio frame grabbing */
@@ -273,13 +272,14 @@ public class VideoEditor {
 
         /* Clean up resources */
         if (simpleAudioFiler != null)
-            simpleAudioFiler.stop();
+            simpleAudioFiler.close();
     }
 
 
     public List<File> writeSegments() {
         this.initFrameGrabber();
 
+        // List of all the segment files in order.
         final List<File> segmentFiles = new ArrayList<>();
 
 
@@ -312,13 +312,40 @@ public class VideoEditor {
                 // Write a new segment to disk
                 final File segmentFile = new File(workingDirectory, String.format("segment %d.mp4", nextStamp));
                 segmentFiles.add(segmentFile); // Add the file to the segments.
+
                 final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(segmentFile, editingFlags, videoGrabber);
+
                 //        recorder.setPixelFormat(frameGrabber.getPixelFormat());
                 //    recorder.setPixelFormat(frameGrabber.getPixelFormat());
                 //   recorder.setVideoCodec(AV_CODEC_ID_H265);
 
                 recorder.start();
 
+                final FFmpegFrameFilter[] filters;
+                // Filters that might be applied if the flag is enabled.
+                if (editingFlags.contains(EditingFlag.PROCESS_SEGMENTS)) {
+                    // TODO: Include audio filters
+                    final List<Filter> exportVideo = FilterManager.FILTER_MANAGER.getFilters(filter -> filter.getFilterRange() == FilterRange.EXPORT && filter.getFilterType() == FilterType.VIDEO);
+
+                    // I hate this.
+                    final EditInfo editInfo = new EditInfoBuilder()
+                            .setAspectRatio(videoGrabber.getAspectRatio())
+                            .setFrameRate(videoGrabber.getFrameRate())
+                            .setImageHeight(videoGrabber.getImageHeight())
+                            .setImageWidth(videoGrabber.getImageWidth())
+                            .setVideoBitrate(videoGrabber.getVideoBitrate())
+                            .setImageScalingFlags(videoGrabber.getImageScalingFlags())
+                            .setVideoCodec(videoGrabber.getVideoCodec())
+                            .setVideoCodecName(videoGrabber.getVideoCodecName())
+                            .setPixelFormat(recorder.getPixelFormat())
+                            .setIntroStart(introStart)
+                            .setIntroEnd(introEnd)
+                            .createEditInfo();
+
+                    filters = new FFmpegFrameFilter[]{FFmpegUtil.populateVideoFilters(exportVideo, editInfo)};
+                } else {
+                    filters = new FFmpegFrameFilter[0];
+                }
 
                 // Time passed in frame times.
                 double localMs = 0;
@@ -326,9 +353,13 @@ public class VideoEditor {
                 // Pick frames till the interim is filled...
                 Frame frame;
                 while ((frame = videoGrabber.grabImage()) != null && localMs < timeBetween) {
-
-                    recorder.record(frame);
+                    FFmpegUtil.pushToFilters(frame, recorder, filters);
                     localMs += frameTime;
+                }
+
+                // Close the filter(s) if there are any.
+                for (final FFmpegFrameFilter filter : filters) {
+                    filter.close();
                 }
 
                 // Close our local recorder.
