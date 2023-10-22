@@ -115,7 +115,6 @@ public class FFmpegUtil {
     public static void configureGrabber(final FFmpegFrameGrabber grabber) {
         grabber.setOption("allowed_extensions", "ALL");
         grabber.setOption("hwaccel", "cuda");
-        grabber.setAudioStream(1);
         grabber.setVideoBitrate(0);
     }
 
@@ -158,10 +157,11 @@ public class FFmpegUtil {
         recorder.setAudioOption("ac", "2"); // Downsample the 5.1 to stereo
         recorder.setVideoCodec(avcodec.AV_CODEC_ID_H265);
         recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
-        recorder.setAudioCodec(avcodec.AV_CODEC_ID_FLAC); // Standard
+
+        recorder.setAudioCodec(avcodec.AV_CODEC_ID_AAC); // Standard
         recorder.setFrameRate(inputGrabber.getFrameRate()); //
         recorder.setSampleRate(inputGrabber.getSampleRate()); // Sample rate from the audio source
-        recorder.setSampleFormat(inputGrabber.getSampleFormat());
+        recorder.setSampleFormat(avutil.AV_SAMPLE_FMT_FLTP);
         // Select the "highest" bitrate.
         recorder.setVideoBitrate(0); // max bitrate
 
@@ -246,10 +246,7 @@ public class FFmpegUtil {
 
         final String chained = chainFilters(filters);
 
-        final FFmpegFrameFilter audioFilter = new FFmpegFrameFilter(chained, 2);
-        audioFilter.start();
-
-        return audioFilter;
+        return new FFmpegFrameFilter(chained, 2);
     }
 
 
