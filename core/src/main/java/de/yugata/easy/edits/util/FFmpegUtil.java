@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * TODO: This needs some documentation, not only for other, but also for myself.
@@ -23,6 +24,7 @@ import java.util.List;
 public class FFmpegUtil {
 
     public static final File RESOURCE_DIRECTORY = new File("editor_resources");
+
 
     static {
         if (!RESOURCE_DIRECTORY.exists()) {
@@ -117,10 +119,17 @@ public class FFmpegUtil {
         grabber.setVideoBitrate(0);
     }
 
+    public static void pushToFilter(final Frame frame, final FFmpegFrameFilter filter, final Consumer<Filter> filterConsumer) {
+
+
+
+
+    }
+
     public static FFmpegFrameRecorder createRecorder(final File outputFile, final EnumSet<EditingFlag> editingFlags, final FFmpegFrameGrabber inputGrabber) throws FFmpegFrameRecorder.Exception {
         final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(outputFile, inputGrabber.getImageWidth(), inputGrabber.getImageHeight(), 2);
 
-        recorder.setFormat("mp4");
+        recorder.setFormat("mkv");
 
         // Preserve the color range for the HDR video files.
         // This lets us tone-map the hdr content later on if we want to.
@@ -144,20 +153,17 @@ public class FFmpegUtil {
             recorder.setOption("bf", "2");
             recorder.setOption("lookahead", "8");
             recorder.setOption("rc", "constqp");
-
-            //  recorder.setOption("b:v", "0");
         }
 
-
-        recorder.setVideoCodec(avcodec.AV_CODEC_ID_HEVC);
+        recorder.setAudioOption("ac", "2"); // Downsample the 5.1 to stereo
+        recorder.setVideoCodec(avcodec.AV_CODEC_ID_H265);
         recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
-        // One of the pixel formats supported by h264 nvenc
-        //   recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
-        recorder.setFrameRate(inputGrabber.getFrameRate());
-        recorder.setSampleRate(inputGrabber.getSampleRate()); //TODO: Audio sample rate
+        recorder.setAudioCodec(avcodec.AV_CODEC_ID_FLAC); // Standard
+        recorder.setFrameRate(inputGrabber.getFrameRate()); //
+        recorder.setSampleRate(inputGrabber.getSampleRate()); // Sample rate from the audio source
+        recorder.setSampleFormat(inputGrabber.getSampleFormat());
         // Select the "highest" bitrate.
         recorder.setVideoBitrate(0); // max bitrate
-        //   recorder.setVideoCodecName("h264_nvenc"); // Hardware-accelerated encoding.
 
         return recorder;
     }

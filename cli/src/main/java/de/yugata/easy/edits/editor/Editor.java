@@ -97,7 +97,7 @@ public class Editor {
                 .setFilters(filterWrappers)
                 .setIntroEnd(intoEnd)
                 .setTimeBetweenBeats(new ArrayDeque<>(timeBetweenBeats))
-                .setVideoTimeStamps(new ArrayList<>(timeStamps))
+                .setVideoClips(new ArrayList<>(timeStamps))
                 .createVideoEditor();
 
         editor.edit(false);

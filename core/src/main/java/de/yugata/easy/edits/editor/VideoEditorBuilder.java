@@ -3,7 +3,6 @@ package de.yugata.easy.edits.editor;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import de.yugata.easy.edits.editor.filter.FilterValue;
 import de.yugata.easy.edits.editor.filter.FilterWrapper;
 
 import java.io.File;
@@ -16,7 +15,7 @@ public class VideoEditorBuilder {
     private String audioPath;
     private File outputFile;
     private Queue<Double> timeBetweenBeats = new ArrayDeque<>();
-    private List<Long> videoTimeStamps = new ArrayList<>();
+    private List<VideoClip> videoClips = new ArrayList<>();
     private EnumSet<EditingFlag> flags = EnumSet.noneOf(EditingFlag.class);
 
     private long introStart = -1, introEnd = -1;
@@ -44,8 +43,8 @@ public class VideoEditorBuilder {
         return this;
     }
 
-    public VideoEditorBuilder setVideoTimeStamps(List<Long> videoTimeStamps) {
-        this.videoTimeStamps = videoTimeStamps;
+    public VideoEditorBuilder setVideoClips(List<VideoClip> videoClips) {
+        this.videoClips = videoClips;
         return this;
     }
 
@@ -81,34 +80,19 @@ public class VideoEditorBuilder {
         final JsonObject editorState = root.getAsJsonObject("editor_state");
         final JsonArray filters = editorState.getAsJsonArray("filters");
         final JsonArray beatTimes = editorState.getAsJsonArray("beat_times");
-        final JsonArray timeStamps = editorState.getAsJsonArray("time_stamps");
+        final JsonArray videoClips = editorState.getAsJsonArray("video_clips");
         final JsonObject editingFlags = editorState.getAsJsonObject("editing_flags");
 
 
         final List<FilterWrapper> mappedFilters = new ArrayList<>();
-        filters.forEach(jsonElement -> {
-            final JsonObject object = jsonElement.getAsJsonObject();
-            final String name = object.get("name").getAsString();
-            final JsonObject value = object.get("values").getAsJsonObject();
+        filters.forEach(jsonElement -> mappedFilters.add(new FilterWrapper(jsonElement.getAsJsonObject())));
 
-            final List<FilterValue> values = new ArrayList<>();
-            // Map the json values to filter values
-            //TODO: Clean up this mess..
-
-            value.asMap().forEach((s, jsonElement1) -> {
-                values.add(new FilterValue(s, jsonElement1.getAsString()));
-            });
-
-            final FilterWrapper wrapper = new FilterWrapper(name,  values);
-            mappedFilters.add(wrapper);
-        });
-
-
-        final List<Long> mappedTimeStamps = new ArrayList<>();
-        timeStamps.forEach(jsonElement -> mappedTimeStamps.add(jsonElement.getAsLong()));
+        final List<VideoClip> mappedVideoClips = new ArrayList<>();
+        videoClips.forEach(jsonElement -> mappedVideoClips.add(new VideoClip(jsonElement.getAsJsonObject())));
 
         final List<Double> mappedBeatTimes = new ArrayList<>();
         beatTimes.forEach(jsonElement -> mappedBeatTimes.add(jsonElement.getAsDouble()));
+
 
         final EnumSet<EditingFlag> mappedEditingFlags = EnumSet.noneOf(EditingFlag.class);
 
@@ -134,12 +118,12 @@ public class VideoEditorBuilder {
                 .setTimeBetweenBeats(new ArrayDeque<>(mappedBeatTimes))
                 .setIntroStart(introStart)
                 .setIntroEnd(introEnd)
-                .setVideoTimeStamps(mappedTimeStamps)
+                .setVideoClips(mappedVideoClips)
                 .createVideoEditor();
     }
 
 
     public VideoEditor createVideoEditor() {
-        return new VideoEditor(videoPath, audioPath, outputFile, timeBetweenBeats, videoTimeStamps, flags, filters, introStart, introEnd, workingDirectory);
+        return new VideoEditor(videoPath, audioPath, outputFile, timeBetweenBeats, videoClips, flags, filters, introStart, introEnd, workingDirectory);
     }
 }
