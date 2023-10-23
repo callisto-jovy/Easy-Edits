@@ -1,4 +1,4 @@
-package de.yugata.easy.edits.editor.filter;
+package de.yugata.easy.edits.filter;
 
 import com.google.gson.JsonObject;
 

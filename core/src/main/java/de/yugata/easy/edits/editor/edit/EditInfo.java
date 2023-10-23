@@ -1,4 +1,4 @@
-package de.yugata.easy.edits.editor;
+package de.yugata.easy.edits.editor.edit;
 
 import java.nio.Buffer;
 import java.util.Map;

@@ -1,24 +1,25 @@
-package de.yugata.easy.edits.editor;
+package de.yugata.easy.edits.editor.video;
 
 import com.google.gson.JsonObject;
 
 public class VideoClip {
 
     private final long timeStamp;
+    private final long length;
+
     private final boolean muteAudio;
-
-
-    public VideoClip(long timeStamp, boolean muteAudio) {
-        this.timeStamp = timeStamp;
-        this.muteAudio = muteAudio;
-    }
 
 
     public VideoClip(final JsonObject jsonElement) {
         this.timeStamp = jsonElement.get("time_stamp").getAsLong();
         this.muteAudio = jsonElement.get("mute_audio").getAsBoolean();
+        this.length = jsonElement.get("clip_length").getAsLong();
     }
 
+
+    public long getLength() {
+        return length;
+    }
 
     public long getTimeStamp() {
         return timeStamp;

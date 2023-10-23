@@ -1,8 +1,10 @@
 module Easy.Edits.core {
 
-    exports de.yugata.easy.edits.editor;
     exports de.yugata.easy.edits.audio;
-    exports de.yugata.easy.edits.editor.filter;
+    exports de.yugata.easy.edits.filter;
+    exports de.yugata.easy.edits.wrapper;
+    exports de.yugata.easy.edits.editor.video;
+    exports de.yugata.easy.edits.editor.edit;
 
     requires java.logging;
     requires java.desktop;

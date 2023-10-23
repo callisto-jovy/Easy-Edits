@@ -1,10 +1,10 @@
-package de.yugata.easy.edits.editor.filter;
+package de.yugata.easy.edits.filter;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import de.yugata.easy.edits.editor.EditInfo;
-import de.yugata.easy.edits.editor.FlutterWrapper;
+import de.yugata.easy.edits.editor.edit.EditInfo;
+import de.yugata.easy.edits.wrapper.FlutterWrapper;
 import de.yugata.easy.edits.util.FFmpegUtil;
 import org.bytedeco.javacpp.tools.ParserException;
 

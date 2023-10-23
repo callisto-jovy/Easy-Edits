@@ -1,7 +1,11 @@
-package de.yugata.easy.edits.editor;
+package de.yugata.easy.edits.editor.video;
 
 
-import de.yugata.easy.edits.editor.filter.*;
+import de.yugata.easy.edits.editor.edit.EditingFlag;
+import de.yugata.easy.edits.editor.edit.EditInfo;
+import de.yugata.easy.edits.editor.edit.EditInfoBuilder;
+import de.yugata.easy.edits.filter.*;
+import de.yugata.easy.edits.filter.FilterWrapper;
 import de.yugata.easy.edits.util.FFmpegUtil;
 import org.bytedeco.ffmpeg.global.avutil;
 import org.bytedeco.javacpp.BytePointer;
@@ -111,6 +115,7 @@ public class VideoEditor {
                 throw new RuntimeException(e);
             }
         }
+
     }
 
     /**
@@ -124,21 +129,6 @@ public class VideoEditor {
             } catch (FrameGrabber.Exception e) {
                 throw new RuntimeException(e);
             }
-        }
-    }
-
-
-    private void pushToFilterOrElse(final Frame frame, final FFmpegFrameFilter filter, final Consumer<Frame> acceptFunction) throws FFmpegFrameFilter.Exception {
-        if (filter == null) {
-            acceptFunction.accept(frame);
-            return;
-        }
-
-        filter.push(frame);
-
-        Frame filterFrame;
-        while ((filterFrame = filter.pull()) != null) {
-            acceptFunction.accept(filterFrame);
         }
     }
 
@@ -209,24 +199,16 @@ public class VideoEditor {
                 simpleAudioFiler.start();
             }
 
-            final FFmpegFrameFilter overlayFilter = new FFmpegFrameFilter("[0:a]volume=0.25[a1]; [a1][1:a]amerge=inputs=2[a]", 2);
-            overlayFilter.setSampleRate(recorder.getSampleRate());
-            overlayFilter.setSampleFormat(recorder.getSampleFormat());
-            overlayFilter.setAudioInputs(2);
-            overlayFilter.setVideoInputs(0); // This apparently is fucking important. The default video inputs = 1! Unfortunately, video inputs is not adjusted, I may have to open a PR for this.
+            final FFmpegFrameFilter overlayFilter = FFmpegUtil.configureAudioFilter("[0:a]volume=0.25[a1]; [a1][1:a]amerge=inputs=2[a]", recorder.getSampleRate(), recorder.getSampleFormat());
             overlayFilter.start();
 
 
             final BytePointer sampleFormatName = avutil.av_get_sample_fmt_name(recorder.getSampleFormat());
-
-            final FFmpegFrameFilter convertAudioFilter = new FFmpegFrameFilter(String.format("aformat=sample_fmts=%s:sample_rates=%d", sampleFormatName.getString(), recorder.getSampleRate()), 2);
-            convertAudioFilter.setSampleRate(recorder.getSampleRate());
-            convertAudioFilter.setSampleFormat(recorder.getSampleFormat());
-            convertAudioFilter.setAudioInputs(1);
-            convertAudioFilter.setVideoInputs(0); // This apparently is fucking important. The default video inputs = 1! Unfortunately, video inputs is not adjusted, I may have to open a PR for this.
+            final FFmpegFrameFilter convertAudioFilter = FFmpegUtil.configureAudioFilter(String.format("aformat=sample_fmts=%s:sample_rates=%d", sampleFormatName.getString(), recorder.getSampleRate()), recorder.getSampleRate(), recorder.getSampleFormat());
             convertAudioFilter.start();
 
             sampleFormatName.close(); // release reference
+
 
             // Configure the simple video filters.
             final FFmpegFrameFilter simpleVideoFiler = FFmpegUtil.populateVideoFilters(editInfo);
@@ -261,10 +243,9 @@ public class VideoEditor {
                 Frame frame;
                 while ((frame = segmentGrabber.grab()) != null) {
 
+
                     Frame audioFrame;
-
-                    //TODO: If the segment has only video, just add the audio.
-
+                    // if there's no audio, we just record.
                     if (!segmentGrabber.hasAudio() && (audioFrame = audioGrabber.grab()) != null) {
                         recorder.record(audioFrame);
                     }
@@ -295,7 +276,7 @@ public class VideoEditor {
                             Frame convertAudioFrame;
                             if ((convertAudioFrame = convertAudioFilter.pull()) != null) {
 
-                                pushToFilterOrElse(convertAudioFrame, simpleAudioFiler, f -> {
+                                FFmpegUtil.pushToFilterOrElse(convertAudioFrame, simpleAudioFiler, f -> {
                                     try {
                                         overlayFilter.push(0, convertAudioFrame);
                                     } catch (FFmpegFrameFilter.Exception e) {
@@ -315,14 +296,10 @@ public class VideoEditor {
                             }
 
                         } else {
-                            System.out.println("Recording audio frame");
                             // Just record the audio
                             recorder.record(audioFrame);
                         }
-                    } else {
-                        System.out.println("no more audio");
                     }
-
                 }
 
                 // Close the transition filter, free the resources
