@@ -101,14 +101,14 @@ public class PreviewEditor {
     }
 
 
-    public String generatePreview(String id, VideoClip videoClip) {
+    public String generatePreview(VideoClip videoClip) {
 
         try (final FFmpegFrameGrabber videoGrabber = new FFmpegFrameGrabber(videoPath)) {
             this.configureFrameGrabber(videoGrabber);
             videoGrabber.start();
             videoGrabber.setTimestamp(videoClip.getTimeStamp());
 
-            final File previewFile = new File(workingDirectory, id);
+            final File previewFile = new File(workingDirectory, UUID.randomUUID() + ".mkv");
 
             final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(previewFile, videoGrabber.getImageWidth(), videoGrabber.getImageHeight(), 2);
             this.configureRecorder(recorder, videoGrabber);
@@ -130,7 +130,7 @@ public class PreviewEditor {
 
 
     public String editPreviews(final List<String> previewPaths, final String audioPath) {
-        final File editOutput = new File(workingDirectory, UUID.randomUUID().toString());
+        final File editOutput = new File(workingDirectory, UUID.randomUUID() + ".mkv");
 
         // get image width & height
 
