@@ -1,16 +1,25 @@
-package de.yugata.easy.edits.editor;
+package de.yugata.easy.edits.wrapper;
 
 
-import de.yugata.easy.edits.editor.filter.FilterType;
-import de.yugata.easy.edits.editor.filter.FilterValue;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import de.yugata.easy.edits.editor.edit.EditingFlag;
+import de.yugata.easy.edits.editor.preview.PreviewEditor;
+import de.yugata.easy.edits.editor.video.VideoClip;
+import de.yugata.easy.edits.editor.video.VideoEditor;
+import de.yugata.easy.edits.editor.video.VideoEditorBuilder;
+import de.yugata.easy.edits.filter.FilterType;
+import de.yugata.easy.edits.filter.FilterValue;
 
-import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static de.yugata.easy.edits.editor.filter.FilterManager.FILTER_MANAGER;
+import static de.yugata.easy.edits.filter.FilterManager.FILTER_MANAGER;
 
 public class FlutterWrapper {
 
@@ -36,6 +45,33 @@ public class FlutterWrapper {
 
         videoEditor.edit(false);
     }
+
+    public static String previewSegment(final String json) {
+        final JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        final String id = root.get("id").getAsString();
+        final VideoClip videoClip = new VideoClip(root.getAsJsonObject("clip"));
+
+        final PreviewEditor previewEditor = PreviewEditor.fromJson(root);
+
+        return previewEditor.generatePreview(id, videoClip);
+    }
+
+    public static String editPreviews(final String json) {
+        final JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        final String audioPath = root.get("source_audio").getAsString();
+
+
+        final JsonArray previewArray = root.getAsJsonArray("previews");
+
+        final List<String> previews = new ArrayList<>();
+        for (final JsonElement jsonElement : previewArray) {
+            previews.add(jsonElement.getAsString());
+        }
+
+        final PreviewEditor previewEditor = PreviewEditor.fromJson(root);
+        return previewEditor.editPreviews(previews, audioPath);
+    }
+
 
     /**
      * Data class to pass to the frontend containing the data the frontend needs to display the filter,

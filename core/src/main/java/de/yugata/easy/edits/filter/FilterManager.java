@@ -1,10 +1,10 @@
-package de.yugata.easy.edits.editor.filter;
+package de.yugata.easy.edits.filter;
 
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import de.yugata.easy.edits.editor.EditInfo;
-import de.yugata.easy.edits.editor.FlutterWrapper;
+import de.yugata.easy.edits.editor.edit.EditInfo;
+import de.yugata.easy.edits.wrapper.FlutterWrapper;
 
 import java.io.File;
 import java.io.FileReader;

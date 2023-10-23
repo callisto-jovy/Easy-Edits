@@ -1,9 +1,10 @@
-package de.yugata.easy.edits.editor;
+package de.yugata.easy.edits.editor.video;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import de.yugata.easy.edits.editor.filter.FilterWrapper;
+import de.yugata.easy.edits.editor.edit.EditingFlag;
+import de.yugata.easy.edits.filter.FilterWrapper;
 
 import java.io.File;
 import java.util.*;

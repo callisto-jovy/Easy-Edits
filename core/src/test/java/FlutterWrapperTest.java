@@ -1,4 +1,4 @@
-import de.yugata.easy.edits.editor.FlutterWrapper;
+import de.yugata.easy.edits.wrapper.FlutterWrapper;
 
 public class FlutterWrapperTest {
 

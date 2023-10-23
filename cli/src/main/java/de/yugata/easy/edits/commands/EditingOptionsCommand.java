@@ -1,7 +1,7 @@
 package de.yugata.easy.edits.commands;
 
 
-import de.yugata.easy.edits.editor.EditingFlag;
+import de.yugata.easy.edits.editor.edit.EditingFlag;
 import de.yugata.easy.edits.editor.Editor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.shell.command.CommandRegistration;

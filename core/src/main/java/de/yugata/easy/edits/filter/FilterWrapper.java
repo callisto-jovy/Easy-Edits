@@ -1,6 +1,7 @@
-package de.yugata.easy.edits.editor.filter;
+package de.yugata.easy.edits.filter;
 
 import com.google.gson.JsonObject;
+import de.yugata.easy.edits.filter.FilterValue;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,11 +1,11 @@
 package de.yugata.easy.edits.util;
 
 
-import de.yugata.easy.edits.editor.EditInfo;
-import de.yugata.easy.edits.editor.EditingFlag;
-import de.yugata.easy.edits.editor.filter.Filter;
-import de.yugata.easy.edits.editor.filter.FilterManager;
-import de.yugata.easy.edits.editor.filter.FilterType;
+import de.yugata.easy.edits.editor.edit.EditInfo;
+import de.yugata.easy.edits.editor.edit.EditingFlag;
+import de.yugata.easy.edits.filter.Filter;
+import de.yugata.easy.edits.filter.FilterManager;
+import de.yugata.easy.edits.filter.FilterType;
 import org.apache.commons.io.FileUtils;
 import org.bytedeco.ffmpeg.global.avcodec;
 import org.bytedeco.ffmpeg.global.avutil;
@@ -112,17 +112,26 @@ public class FFmpegUtil {
     }
 
 
+    public static void pushToFilterOrElse(final Frame frame, final FFmpegFrameFilter filter, final Consumer<Frame> acceptFunction) throws FFmpegFrameFilter.Exception {
+        if (filter == null) {
+            acceptFunction.accept(frame);
+            return;
+        }
+
+        filter.push(frame);
+
+        Frame filterFrame;
+        while ((filterFrame = filter.pull()) != null) {
+            acceptFunction.accept(filterFrame);
+        }
+    }
+
+
+
     public static void configureGrabber(final FFmpegFrameGrabber grabber) {
         grabber.setOption("allowed_extensions", "ALL");
         grabber.setOption("hwaccel", "cuda");
         grabber.setVideoBitrate(0);
-    }
-
-    public static void pushToFilter(final Frame frame, final FFmpegFrameFilter filter, final Consumer<Filter> filterConsumer) {
-
-
-
-
     }
 
     public static FFmpegFrameRecorder createRecorder(final File outputFile, final EnumSet<EditingFlag> editingFlags, final FFmpegFrameGrabber inputGrabber) throws FFmpegFrameRecorder.Exception {
@@ -167,6 +176,18 @@ public class FFmpegUtil {
 
         return recorder;
     }
+
+
+    public static FFmpegFrameFilter configureAudioFilter(final String filter, final int sampleRate, final int sampleFormat) {
+        final FFmpegFrameFilter fFmpegFrameFilter = new FFmpegFrameFilter(filter, 2);
+        fFmpegFrameFilter.setSampleRate(sampleRate);
+        fFmpegFrameFilter.setSampleFormat(sampleFormat);
+        fFmpegFrameFilter.setAudioInputs(2);
+        fFmpegFrameFilter.setVideoInputs(0); // This apparently is fucking important. The default video inputs = 1! Unfortunately, video inputs is not adjusted, I may have to open a PR for this.
+
+        return fFmpegFrameFilter;
+    }
+
 
     /**
      * Chains a list of {@link Filter} together.

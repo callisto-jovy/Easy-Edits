@@ -2,7 +2,6 @@ package de.yugata.easy.edits.commands;
 
 
 import de.yugata.easy.edits.editor.Editor;
-import de.yugata.easy.edits.editor.FlutterWrapper;
 import de.yugata.easy.edits.model.CLIArgs;
 import org.springframework.shell.Availability;
 import org.springframework.shell.standard.ShellComponent;
