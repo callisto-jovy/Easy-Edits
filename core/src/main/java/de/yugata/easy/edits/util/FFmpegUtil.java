@@ -182,7 +182,6 @@ public class FFmpegUtil {
         final FFmpegFrameFilter fFmpegFrameFilter = new FFmpegFrameFilter(filter, 2);
         fFmpegFrameFilter.setSampleRate(sampleRate);
         fFmpegFrameFilter.setSampleFormat(sampleFormat);
-        fFmpegFrameFilter.setAudioInputs(2);
         fFmpegFrameFilter.setVideoInputs(0); // This apparently is fucking important. The default video inputs = 1! Unfortunately, video inputs is not adjusted, I may have to open a PR for this.
 
         return fFmpegFrameFilter;
