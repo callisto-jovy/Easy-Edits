@@ -48,12 +48,11 @@ public class FlutterWrapper {
 
     public static String previewSegment(final String json) {
         final JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-        final String id = root.get("id").getAsString();
-        final VideoClip videoClip = new VideoClip(root.getAsJsonObject("clip"));
 
         final PreviewEditor previewEditor = PreviewEditor.fromJson(root);
 
-        return previewEditor.generatePreview(id, videoClip);
+        final VideoClip videoClip = new VideoClip(root.getAsJsonObject("clip"));
+        return previewEditor.generatePreview(videoClip);
     }
 
     public static String editPreviews(final String json) {

@@ -13,7 +13,7 @@ public class VideoClip {
     public VideoClip(final JsonObject jsonElement) {
         this.timeStamp = jsonElement.get("time_stamp").getAsLong();
         this.muteAudio = jsonElement.get("mute_audio").getAsBoolean();
-        this.length = jsonElement.get("clip_length").getAsLong();
+        this.length = jsonElement.has("clip_length") ? jsonElement.get("clip_length").getAsLong() : -1;
     }
 
 
