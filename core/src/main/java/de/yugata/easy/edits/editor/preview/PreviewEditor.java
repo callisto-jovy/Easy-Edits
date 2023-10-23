@@ -183,11 +183,13 @@ public class PreviewEditor {
 
 
             final FFmpegFrameFilter overlayFilter = FFmpegUtil.configureAudioFilter("[0:a]volume=0.25[a1]; [a1][1:a]amerge=inputs=2[a]", recorder.getSampleRate(), recorder.getSampleFormat());
+            overlayFilter.setAudioInputs(2);
             overlayFilter.start();
 
 
             final BytePointer sampleFormatName = avutil.av_get_sample_fmt_name(recorder.getSampleFormat());
             final FFmpegFrameFilter convertAudioFilter = FFmpegUtil.configureAudioFilter(String.format("aformat=sample_fmts=%s:sample_rates=%d", sampleFormatName.getString(), recorder.getSampleRate()), recorder.getSampleRate(), recorder.getSampleFormat());
+            convertAudioFilter.setAudioInputs(1);
             convertAudioFilter.start();
 
             sampleFormatName.close(); // release reference
