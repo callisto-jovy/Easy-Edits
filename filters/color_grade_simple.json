@@ -24,7 +24,7 @@
     {
       "name": "contrast",
       "type": "VALUE",
-      "default": "1"
+      "default": "strong_contrast"
     }
   ]
 }

@@ -241,10 +241,14 @@ public class VideoEditor {
                     filters = transitionFilter == null ? new FFmpegFrameFilter[]{simpleVideoFiler} : new FFmpegFrameFilter[]{transitionFilter, simpleVideoFiler};
                 }
 
+                // Video grabbing...
+                final long statTimeStamp = recorder.getTimestamp();
+
+
+
                 // grab the frames & send them to the filters
                 Frame frame;
                 while ((frame = segmentGrabber.grab()) != null) {
-
 
                     Frame audioFrame;
                     // if there's no audio, we just record.
