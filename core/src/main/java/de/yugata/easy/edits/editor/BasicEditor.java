@@ -21,7 +21,6 @@ public class BasicEditor implements Editor {
     private final FFmpegFrameRecorder recorder;
     private final List<FilterWrapper> filters;
 
-
     public BasicEditor(FFmpegFrameGrabber videoGrabber, String audioPath, FFmpegFrameRecorder recorder, List<FilterWrapper> filters, EnumSet<EditingFlag> editingFlags) {
         this.videoGrabber = videoGrabber;
         this.audioPath = audioPath;
