@@ -9,8 +9,6 @@ import de.yugata.easy.edits.editor.edit.EditInfoBuilder;
 import de.yugata.easy.edits.editor.edit.EditingFlag;
 import de.yugata.easy.edits.filter.*;
 import de.yugata.easy.edits.util.FFmpegUtil;
-import org.bytedeco.ffmpeg.global.avutil;
-import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacv.*;
 
 import java.io.File;
@@ -188,18 +186,14 @@ public class VideoEditor implements Editor {
         // List of all the segment files in order.
         final List<File> segmentFiles = new ArrayList<>();
 
-
-        // The videos framerate
-        final double frameRate = videoGrabber.getFrameRate();
-        // The time one frame takes in ms.
-        final double frameTime = 1000 / frameRate;
-
         // Shuffle the sequences if the flag is toggled.
         if (editingFlags.contains(EditingFlag.SHUFFLE_SEQUENCES)) {
             Collections.shuffle(videoClips);
         }
 
         try {
+
+            //FIXME: one training file is created which has no audio, nor video..
 
             /* Record the intro */
 
@@ -222,22 +216,9 @@ public class VideoEditor implements Editor {
 
             int nextStamp = 0;
 
-            boolean muteAudio = true;
-
-            /* Beat loop */
-            while (timeBetweenBeats.peek() != null) {
-                double timeBetween = timeBetweenBeats.poll();
-
-                // If the next stamp (index in the list) is valid, we move to the timestamp.
-                // If not, we just keep recording, until no beat times are left
-                // This is nice to have for ending sequences, where a last sequence is displayed for x seconds.
-                if (nextStamp < videoClips.size()) {
-                    final VideoClip videoClip = videoClips.get(nextStamp);
-                    muteAudio = videoClip.isMuteAudio();
-
-                    final long timeStamp = videoClip.getTimeStamp();
-                    videoGrabber.setTimestamp(timeStamp);
-                }
+            for (final VideoClip videoClip : videoClips) {
+                // Navigate to the clip.
+                videoGrabber.setTimestamp(videoClip.getTimeStamp());
 
                 // Write a new segment to disk
                 final File segmentFile = new File(workingDirectory, String.format("segment %d.mp4", introStart == -1 ? nextStamp : nextStamp + 1));
@@ -272,14 +253,10 @@ public class VideoEditor implements Editor {
                     filters = new FFmpegFrameFilter[0];
                 }
 
-                // Time passed in frame times.
-                double localMs = 0;
 
-                // Pick frames till the interim is filled...
                 Frame frame;
-                while ((frame = muteAudio ? videoGrabber.grabImage() : videoGrabber.grab()) != null && localMs < timeBetween) {
+                while (videoGrabber.getTimestamp() - videoClip.getTimeStamp() < videoClip.getLength() && (frame = videoGrabber.grab()) != null) {
                     FFmpegUtil.pushToFilters(frame, recorder, filters);
-                    localMs += frameTime;
                 }
 
                 // Close the filter(s) if there are any.
@@ -289,11 +266,9 @@ public class VideoEditor implements Editor {
 
                 // Close our local recorder.
                 recorder.close();
-                // Advance to the next timestamp.
-                nextStamp++;
             }
-            /* End beat loop */
 
+            /* End beat loop */
             this.releaseFrameGrabber();
 
         } catch (IOException e) {

@@ -121,7 +121,7 @@ public class PreviewEditor implements Editor {
             recorder.start();
 
             Frame frame;
-            while ((frame = videoGrabber.grab()) != null && videoGrabber.getTimestamp() - videoClip.getTimeStamp() < videoClip.getLength()) {
+            while (videoGrabber.getTimestamp() - videoClip.getTimeStamp() < videoClip.getLength() && (frame = videoGrabber.grab()) != null) {
                 recorder.record(frame);
             }
 
