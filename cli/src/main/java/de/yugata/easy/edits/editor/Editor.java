@@ -4,7 +4,10 @@ package de.yugata.easy.edits.editor;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import de.yugata.easy.edits.audio.AudioAnalyser;
-import de.yugata.easy.edits.editor.filter.FilterWrapper;
+import de.yugata.easy.edits.editor.edit.EditingFlag;
+import de.yugata.easy.edits.editor.video.VideoEditor;
+import de.yugata.easy.edits.editor.video.VideoEditorBuilder;
+import de.yugata.easy.edits.filter.FilterWrapper;
 import de.yugata.easy.edits.model.CLIArgs;
 
 import java.io.File;

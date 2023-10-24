@@ -1,11 +1,13 @@
 package de.yugata.easy.edits.editor.video;
 
 
-import de.yugata.easy.edits.editor.edit.EditingFlag;
+import de.yugata.easy.edits.editor.BasicEditor;
+import de.yugata.easy.edits.editor.BasicEditorBuilder;
+import de.yugata.easy.edits.editor.Editor;
 import de.yugata.easy.edits.editor.edit.EditInfo;
 import de.yugata.easy.edits.editor.edit.EditInfoBuilder;
+import de.yugata.easy.edits.editor.edit.EditingFlag;
 import de.yugata.easy.edits.filter.*;
-import de.yugata.easy.edits.filter.FilterWrapper;
 import de.yugata.easy.edits.util.FFmpegUtil;
 import org.bytedeco.ffmpeg.global.avutil;
 import org.bytedeco.javacpp.BytePointer;
@@ -14,7 +16,6 @@ import org.bytedeco.javacv.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static org.bytedeco.ffmpeg.global.avutil.AV_LOG_VERBOSE;
@@ -23,7 +24,7 @@ import static org.bytedeco.ffmpeg.global.avutil.av_log_set_level;
 /**
  * TODO: This needs documentation & a cleanup
  */
-public class VideoEditor {
+public class VideoEditor implements Editor {
 
     private final Queue<Double> timeBetweenBeats;
     private final List<VideoClip> videoClips;
@@ -141,6 +142,7 @@ public class VideoEditor {
     private List<File> collectSegments(final boolean useSegments) {
         if (useSegments) {
             return Arrays.stream(workingDirectory.listFiles())
+                    .filter(file -> file.getName().startsWith("segment"))
                     .sorted(Comparator.comparingInt(value -> Integer.parseInt(value.getName().substring("segment ".length(), value.getName().lastIndexOf(".")))))
                     .collect(Collectors.toList());
 
@@ -155,184 +157,25 @@ public class VideoEditor {
 
         this.initFrameGrabber();
 
-        // Recorder for the final product & audio grabber to overlay the audio
-        try (final FFmpegFrameGrabber audioGrabber = new FFmpegFrameGrabber(audioPath)) {
-
+        try {
+            // Configure the recorder
             final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(outputFile, editingFlags, videoGrabber);
             recorder.start();
 
-            audioGrabber.setSampleRate(recorder.getSampleRate());
-            audioGrabber.setSampleFormat(recorder.getSampleFormat());
-            audioGrabber.start();
 
-            // Edit: I fucking hate this, we just pass the frame grabber in the fucking future...
-            final EditInfo editInfo = new EditInfoBuilder()
-                    .setEditTime(audioGrabber.getLengthInTime())
-                    .setAudioCodec(audioGrabber.getAudioCodec())
-                    .setAspectRatio(videoGrabber.getAspectRatio())
-                    .setAudioChannels(audioGrabber.getAudioChannels())
-                    .setAudioBitrate(audioGrabber.getAudioBitrate())
-                    .setFrameRate(videoGrabber.getFrameRate())
-                    .setImageHeight(videoGrabber.getImageHeight())
-                    .setImageWidth(videoGrabber.getImageWidth())
-                    .setAudioCodecName(audioGrabber.getAudioCodecName())
-                    .setSampleFormat(audioGrabber.getSampleFormat())
-                    .setVideoBitrate(videoGrabber.getVideoBitrate())
-                    .setImageScalingFlags(videoGrabber.getImageScalingFlags())
-                    .setSampleRate(audioGrabber.getSampleRate())
-                    .setVideoCodec(videoGrabber.getVideoCodec())
-                    .setVideoCodecName(videoGrabber.getVideoCodecName())
-                    .setPixelFormat(recorder.getPixelFormat())
-                    .setIntroStart(introStart)
-                    .setIntroEnd(introEnd)
-                    .createEditInfo();
+            final BasicEditor basicEditor = new BasicEditorBuilder()
+                    .setAudioPath(audioPath)
+                    .setEditingFlags(editingFlags)
+                    .setFilters(filters)
+                    .setRecorder(recorder)
+                    .setVideoGrabber(videoGrabber)
+                    .createBasicEditor();
 
+            basicEditor.editFootage(segments.stream().map(File::getAbsolutePath).collect(Collectors.toList()), "h265_cuvid");
 
-            // Populate the filters
-            FilterManager.FILTER_MANAGER.populateFilters(filters, editInfo);
-
-
-            final FFmpegFrameFilter simpleAudioFiler = FFmpegUtil.populateAudioFilters();
-            if (simpleAudioFiler != null) {
-                simpleAudioFiler.setSampleRate(recorder.getSampleRate());
-                simpleAudioFiler.setSampleFormat(recorder.getSampleFormat());
-                simpleAudioFiler.start();
-            }
-
-            final FFmpegFrameFilter overlayFilter = FFmpegUtil.configureAudioFilter("[0:a]volume=0.25[a1]; [a1][1:a]amerge=inputs=2[a]", recorder.getSampleRate(), recorder.getSampleFormat());
-            overlayFilter.setAudioInputs(2);
-            overlayFilter.start();
-
-
-            final BytePointer sampleFormatName = avutil.av_get_sample_fmt_name(recorder.getSampleFormat());
-            final FFmpegFrameFilter convertAudioFilter = FFmpegUtil.configureAudioFilter(String.format("aformat=sample_fmts=%s:sample_rates=%d", sampleFormatName.getString(), recorder.getSampleRate()), recorder.getSampleRate(), recorder.getSampleFormat());
-            convertAudioFilter.setAudioInputs(1);
-            convertAudioFilter.start();
-
-            sampleFormatName.close(); // release reference
-
-
-            // Configure the simple video filters.
-            final FFmpegFrameFilter simpleVideoFiler = FFmpegUtil.populateVideoFilters(editInfo);
-
-            /* Writing the segments to the main file, apply filters */
-
-            for (final File segment : segments) {
-                // TODO: Move to util maybe
-
-                final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(segment);
-                FFmpegUtil.configureGrabber(segmentGrabber);
-                segmentGrabber.setSampleFormat(recorder.getSampleFormat());
-                segmentGrabber.setSampleRate(recorder.getSampleRate());
-                segmentGrabber.setVideoCodecName("h265_cuvid"); // HW-Accelerated grabbing
-                segmentGrabber.setPixelFormat(recorder.getPixelFormat());
-                segmentGrabber.start();
-
-
-                // Populate the transition filters, we have to reconfigure them every time, as the offsets depend on it.
-                final FFmpegFrameFilter transitionFilter = FFmpegUtil.populateTransitionFilters(editInfo);
-
-                // Add the filters to a chain.
-                final FFmpegFrameFilter[] filters;
-
-                if (simpleVideoFiler == null) {
-                    filters = new FFmpegFrameFilter[]{};
-                } else {
-                    filters = transitionFilter == null ? new FFmpegFrameFilter[]{simpleVideoFiler} : new FFmpegFrameFilter[]{transitionFilter, simpleVideoFiler};
-                }
-
-                // Video grabbing...
-                final long statTimeStamp = recorder.getTimestamp();
-
-
-
-                // grab the frames & send them to the filters
-                Frame frame;
-                while ((frame = segmentGrabber.grab()) != null) {
-
-                    Frame audioFrame;
-                    // if there's no audio, we just record.
-                    if (!segmentGrabber.hasAudio() && (audioFrame = audioGrabber.grab()) != null) {
-                        recorder.record(audioFrame);
-                    }
-
-                    // just record the video, skip the audio part, there is none.
-                    if (frame.getTypes().contains(Frame.Type.VIDEO)) {
-                        FFmpegUtil.pushToFilters(frame, recorder, filters);
-                        continue;
-                    }
-
-                    // if there's no audio, no audio will be in the edit.
-                    if ((audioFrame = audioGrabber.grab()) != null) {
-
-                        // overlay background audio.
-                        if (segmentGrabber.hasAudio()) {
-
-                            // Do audio processing
-                            try {
-                                overlayFilter.push(1, frame);
-                            } catch (FFmpegFrameFilter.Exception e) {
-                                throw new RuntimeException(e);
-                            }
-
-
-                            // process the audio frame
-                            convertAudioFilter.push(audioFrame);
-
-                            Frame convertAudioFrame;
-                            if ((convertAudioFrame = convertAudioFilter.pull()) != null) {
-
-                                FFmpegUtil.pushToFilterOrElse(convertAudioFrame, simpleAudioFiler, f -> {
-                                    try {
-                                        overlayFilter.push(0, convertAudioFrame);
-                                    } catch (FFmpegFrameFilter.Exception e) {
-                                        throw new RuntimeException(e);
-                                    }
-
-                                });
-
-                            }
-
-
-                            // Pull from the overlay filter & record.
-                            Frame overlayFrame;
-                            while ((overlayFrame = overlayFilter.pull()) != null) {
-                                // Set the timestamp in the recorder.
-                                recorder.record(overlayFrame);
-                            }
-
-                        } else {
-                            // Just record the audio
-                            recorder.record(audioFrame);
-                        }
-                    }
-                }
-
-                // Close the transition filter, free the resources
-                if (transitionFilter != null)
-                    transitionFilter.close();
-
-                // Close the grabber, release the resources
-                segmentGrabber.close();
-            }
-
-            /* End recording video */
-
-            /* Clean up resources */
-
-            if (simpleVideoFiler != null)
-                simpleVideoFiler.close();
-
-            if (simpleAudioFiler != null)
-                simpleAudioFiler.close();
-
-            overlayFilter.close();
             recorder.close();
-            ///////////////
         } catch (FrameRecorder.Exception | FrameGrabber.Exception | FrameFilter.Exception e) {
             e.printStackTrace();
-            // delete file.
-            outputFile.delete();
         } finally {
             this.releaseFrameGrabber();
         }
