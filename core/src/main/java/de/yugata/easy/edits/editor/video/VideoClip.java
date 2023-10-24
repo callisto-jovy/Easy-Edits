@@ -17,6 +17,8 @@ public class VideoClip {
         this.muteAudio = jsonElement.get("mute_audio").getAsBoolean();
         // Passed length is in millis, so we have to convert it to micros.
         this.length = TimeUnit.MILLISECONDS.toMicros(jsonElement.has("clip_length") ? jsonElement.get("clip_length").getAsLong() : -1);
+
+        System.out.println(length);
     }
 
 

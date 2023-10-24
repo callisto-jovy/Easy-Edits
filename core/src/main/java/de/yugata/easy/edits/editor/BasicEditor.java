@@ -1,6 +1,7 @@
 package de.yugata.easy.edits.editor;
 
 import de.yugata.easy.edits.editor.edit.EditInfo;
+import de.yugata.easy.edits.editor.edit.EditInfoBuilder;
 import de.yugata.easy.edits.editor.edit.EditingFlag;
 import de.yugata.easy.edits.filter.FilterManager;
 import de.yugata.easy.edits.filter.FilterWrapper;
@@ -21,11 +22,14 @@ public class BasicEditor implements Editor {
     private final FFmpegFrameRecorder recorder;
     private final List<FilterWrapper> filters;
 
-    public BasicEditor(FFmpegFrameGrabber videoGrabber, String audioPath, FFmpegFrameRecorder recorder, List<FilterWrapper> filters, EnumSet<EditingFlag> editingFlags) {
+    private final long editLength;
+
+    public BasicEditor(FFmpegFrameGrabber videoGrabber, String audioPath, FFmpegFrameRecorder recorder, List<FilterWrapper> filters, EnumSet<EditingFlag> editingFlags, long editLength) {
         this.videoGrabber = videoGrabber;
         this.audioPath = audioPath;
         this.recorder = recorder;
         this.filters = filters;
+        this.editLength = editLength;
 
         if (editingFlags.contains(EditingFlag.PRINT_DEBUG)) {
             FFmpegLogCallback.set();
@@ -44,7 +48,24 @@ public class BasicEditor implements Editor {
 
 
         // Edit: I fucking hate this, we just pass the frame grabber in the fucking future...
-        final EditInfo editInfo = buildEditInfo(videoGrabber, audioGrabber, recorder);
+        final EditInfo editInfo = new EditInfoBuilder()
+                .setEditTime(editLength)
+                .setAudioCodec(audioGrabber.getAudioCodec())
+                .setAspectRatio(videoGrabber.getAspectRatio())
+                .setAudioChannels(audioGrabber.getAudioChannels())
+                .setAudioBitrate(audioGrabber.getAudioBitrate())
+                .setFrameRate(videoGrabber.getFrameRate())
+                .setImageHeight(videoGrabber.getImageHeight())
+                .setImageWidth(videoGrabber.getImageWidth())
+                .setAudioCodecName(audioGrabber.getAudioCodecName())
+                .setSampleFormat(audioGrabber.getSampleFormat())
+                .setVideoBitrate(videoGrabber.getVideoBitrate())
+                .setImageScalingFlags(videoGrabber.getImageScalingFlags())
+                .setSampleRate(audioGrabber.getSampleRate())
+                .setVideoCodec(videoGrabber.getVideoCodec())
+                .setVideoCodecName(videoGrabber.getVideoCodecName())
+                .setPixelFormat(recorder.getPixelFormat())
+                .createEditInfo();
 
 
         // Populate the filters
@@ -114,7 +135,7 @@ public class BasicEditor implements Editor {
                 Frame segmentAudio;
                 while ((segmentAudio = segmentGrabber.grabSamples()) != null) {
 
-                    // Push the background audio to [0], no volume decrease
+                    // Push the background audio to [1], no volume decrease
                     overlayFilter.push(1, segmentAudio);
                 }
 

@@ -156,6 +156,7 @@ public class PreviewEditor implements Editor {
                     .setFilters(filters)
                     .setRecorder(recorder)
                     .setVideoGrabber(videoGrabber)
+                    .setEditLength(getEditLength(previewPaths))
                     .createBasicEditor();
 
             basicEditor.editFootage(previewPaths, "h264_nvenc");

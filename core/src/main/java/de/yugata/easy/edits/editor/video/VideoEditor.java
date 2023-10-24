@@ -24,7 +24,6 @@ import static org.bytedeco.ffmpeg.global.avutil.av_log_set_level;
  */
 public class VideoEditor implements Editor {
 
-    private final Queue<Double> timeBetweenBeats;
     private final List<VideoClip> videoClips;
 
 
@@ -52,11 +51,12 @@ public class VideoEditor implements Editor {
 
     private final File outputFile, workingDirectory;
 
+    private int editLength;
+
 
     public VideoEditor(final String videoPath,
                        final String audioPath,
                        final File outputFile,
-                       final Queue<Double> timeBetweenBeats,
                        final List<VideoClip> videoClips,
                        final EnumSet<EditingFlag> flags,
                        final List<FilterWrapper> filters,
@@ -66,7 +66,6 @@ public class VideoEditor implements Editor {
 
         this.videoPath = videoPath;
         this.audioPath = audioPath;
-        this.timeBetweenBeats = timeBetweenBeats;
         this.videoClips = videoClips;
         this.editingFlags = flags;
         this.introStart = introStart;
@@ -167,6 +166,7 @@ public class VideoEditor implements Editor {
                     .setFilters(filters)
                     .setRecorder(recorder)
                     .setVideoGrabber(videoGrabber)
+                    .setEditLength(videoClips.stream().map(VideoClip::getLength).reduce(Long::sum).orElse(0L))
                     .createBasicEditor();
 
             basicEditor.editFootage(segments.stream().map(File::getAbsolutePath).collect(Collectors.toList()), "h265_cuvid");
@@ -213,15 +213,13 @@ public class VideoEditor implements Editor {
                 segmentFiles.add(introFile);
             }
 
-
-            int nextStamp = 0;
-
-            for (final VideoClip videoClip : videoClips) {
+            for (int i = 0; i < videoClips.size(); i++) {
+                final VideoClip videoClip = videoClips.get(i);
                 // Navigate to the clip.
                 videoGrabber.setTimestamp(videoClip.getTimeStamp());
 
                 // Write a new segment to disk
-                final File segmentFile = new File(workingDirectory, String.format("segment %d.mp4", introStart == -1 ? nextStamp : nextStamp + 1));
+                final File segmentFile = new File(workingDirectory, String.format("segment %d.mp4", introStart == -1 ? i : i + 1));
                 segmentFiles.add(segmentFile); // Add the file to the segments.
 
                 final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(segmentFile, editingFlags, videoGrabber);
@@ -255,7 +253,7 @@ public class VideoEditor implements Editor {
 
 
                 Frame frame;
-                while (videoGrabber.getTimestamp() - videoClip.getTimeStamp() < videoClip.getLength() && (frame = videoGrabber.grab()) != null) {
+                while (videoGrabber.getTimestamp() - videoClip.getTimeStamp() < videoClip.getLength() && (frame = videoClip.isMuteAudio() ? videoGrabber.grabImage() : videoGrabber.grab()) != null) {
                     FFmpegUtil.pushToFilters(frame, recorder, filters);
                 }
 
