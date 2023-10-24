@@ -68,6 +68,11 @@ public class BasicEditor implements Editor {
             // grabber for the individual clip segment
             final FFmpegFrameGrabber segmentGrabber = baseSegmentGrabber(new File(inputPath), recorder, segmentGrabberVideoCodec);
 
+            // Safety mechanism.
+            if (!segmentGrabber.hasAudio() && !segmentGrabber.hasVideo()) {
+                continue;
+            }
+
 
             // Optional: Populate the transition filters, we have to reconfigure them every time, as the offsets depend on it.
             final FFmpegFrameFilter transitionFilter = FFmpegUtil.populateTransitionFilters(editInfo);
