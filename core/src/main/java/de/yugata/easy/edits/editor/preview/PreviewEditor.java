@@ -99,7 +99,7 @@ public class PreviewEditor implements Editor {
     }
 
 
-    public String generatePreview(VideoClip videoClip) {
+    public String generatePreview(final VideoClip videoClip) {
 
         try (final FFmpegFrameGrabber videoGrabber = new FFmpegFrameGrabber(videoPath)) {
             this.configureFrameGrabber(videoGrabber);

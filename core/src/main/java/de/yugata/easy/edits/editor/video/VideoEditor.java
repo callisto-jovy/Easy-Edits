@@ -151,6 +151,7 @@ public class VideoEditor implements Editor {
     public void edit(final boolean useSegments) {
         // Write the segment files that will be stitched together.
         final List<File> segments = collectSegments(useSegments);
+        final List<String> segmentPaths = segments.stream().map(File::getAbsolutePath).collect(Collectors.toList());
 
         this.initFrameGrabber();
 
@@ -166,10 +167,10 @@ public class VideoEditor implements Editor {
                     .setFilters(filters)
                     .setRecorder(recorder)
                     .setVideoGrabber(videoGrabber)
-                    .setEditLength(videoClips.stream().map(VideoClip::getLength).reduce(Long::sum).orElse(0L))
+                    .setEditLength(getEditLength(segmentPaths))
                     .createBasicEditor();
 
-            basicEditor.editFootage(segments.stream().map(File::getAbsolutePath).collect(Collectors.toList()), "h265_cuvid");
+            basicEditor.editFootage(segmentPaths, "h265_cuvid");
 
             recorder.close();
         } catch (FrameRecorder.Exception | FrameGrabber.Exception | FrameFilter.Exception e) {
@@ -193,8 +194,6 @@ public class VideoEditor implements Editor {
 
         try {
 
-            //FIXME: one training file is created which has no audio, nor video..
-
             /* Record the intro */
 
             if (introStart != -1 && introEnd != -1) {
@@ -205,7 +204,7 @@ public class VideoEditor implements Editor {
                 this.videoGrabber.setTimestamp(introStart);
                 // grab from the intro
                 Frame introFrame;
-                while ((introFrame = videoGrabber.grab()) != null && videoGrabber.getTimestamp() < introEnd) {
+                while (videoGrabber.getTimestamp() < introEnd && (introFrame = videoGrabber.grab()) != null) {
                     introRecorder.record(introFrame);
                 }
 
@@ -215,8 +214,9 @@ public class VideoEditor implements Editor {
 
             for (int i = 0; i < videoClips.size(); i++) {
                 final VideoClip videoClip = videoClips.get(i);
+
                 // Navigate to the clip.
-                videoGrabber.setTimestamp(videoClip.getTimeStamp());
+                videoGrabber.setVideoTimestamp(videoClip.getTimeStamp());
 
                 // Write a new segment to disk
                 final File segmentFile = new File(workingDirectory, String.format("segment %d.mp4", introStart == -1 ? i : i + 1));
@@ -250,7 +250,6 @@ public class VideoEditor implements Editor {
                 } else {
                     filters = new FFmpegFrameFilter[0];
                 }
-
 
                 Frame frame;
                 while (videoGrabber.getTimestamp() - videoClip.getTimeStamp() < videoClip.getLength() && (frame = videoClip.isMuteAudio() ? videoGrabber.grabImage() : videoGrabber.grab()) != null) {
