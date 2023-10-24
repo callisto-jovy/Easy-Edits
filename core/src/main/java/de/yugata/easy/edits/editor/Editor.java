@@ -8,6 +8,7 @@ import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacv.*;
 
 import java.io.File;
+import java.util.List;
 
 public interface Editor {
 
@@ -52,28 +53,20 @@ public interface Editor {
         return convertAudioFilter;
     }
 
+    //TODO: Rework this.
+    default long getEditLength(final List<String> videoPaths) throws FrameGrabber.Exception {
+        long time = 0;
 
-    // TODO: Refine this.
-    default EditInfo buildEditInfo(final FFmpegFrameGrabber videoGrabber, final FFmpegFrameGrabber audioGrabber, final FFmpegFrameRecorder recorder) {
-        return new EditInfoBuilder()
-                .setEditTime(audioGrabber.getLengthInTime())
-                .setAudioCodec(audioGrabber.getAudioCodec())
-                .setAspectRatio(videoGrabber.getAspectRatio())
-                .setAudioChannels(audioGrabber.getAudioChannels())
-                .setAudioBitrate(audioGrabber.getAudioBitrate())
-                .setFrameRate(videoGrabber.getFrameRate())
-                .setImageHeight(videoGrabber.getImageHeight())
-                .setImageWidth(videoGrabber.getImageWidth())
-                .setAudioCodecName(audioGrabber.getAudioCodecName())
-                .setSampleFormat(audioGrabber.getSampleFormat())
-                .setVideoBitrate(videoGrabber.getVideoBitrate())
-                .setImageScalingFlags(videoGrabber.getImageScalingFlags())
-                .setSampleRate(audioGrabber.getSampleRate())
-                .setVideoCodec(videoGrabber.getVideoCodec())
-                .setVideoCodecName(videoGrabber.getVideoCodecName())
-                .setPixelFormat(recorder.getPixelFormat())
-                .createEditInfo();
+        for (String videoPath : videoPaths) {
+            final FFmpegFrameGrabber segmentGrabber = new FFmpegFrameGrabber(videoPath);
+            segmentGrabber.start();
+            time += segmentGrabber.getLengthInTime();
+            segmentGrabber.close();
+        }
+
+        return time;
     }
+
 
 
 }
