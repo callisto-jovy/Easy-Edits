@@ -15,7 +15,6 @@ public class VideoEditorBuilder {
     private String videoPath;
     private String audioPath;
     private File outputFile;
-    private Queue<Double> timeBetweenBeats = new ArrayDeque<>();
     private List<VideoClip> videoClips = new ArrayList<>();
     private EnumSet<EditingFlag> flags = EnumSet.noneOf(EditingFlag.class);
 
@@ -36,11 +35,6 @@ public class VideoEditorBuilder {
 
     public VideoEditorBuilder setOutputFile(File outputFile) {
         this.outputFile = outputFile;
-        return this;
-    }
-
-    public VideoEditorBuilder setTimeBetweenBeats(Queue<Double> timeBetweenBeats) {
-        this.timeBetweenBeats = timeBetweenBeats;
         return this;
     }
 
@@ -80,7 +74,6 @@ public class VideoEditorBuilder {
         final JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         final JsonObject editorState = root.getAsJsonObject("editor_state");
         final JsonArray filters = editorState.getAsJsonArray("filters");
-        final JsonArray beatTimes = editorState.getAsJsonArray("beat_times");
         final JsonArray videoClips = editorState.getAsJsonArray("video_clips");
         final JsonObject editingFlags = editorState.getAsJsonObject("editing_flags");
 
@@ -90,10 +83,6 @@ public class VideoEditorBuilder {
 
         final List<VideoClip> mappedVideoClips = new ArrayList<>();
         videoClips.forEach(jsonElement -> mappedVideoClips.add(new VideoClip(jsonElement.getAsJsonObject())));
-
-        final List<Double> mappedBeatTimes = new ArrayList<>();
-        beatTimes.forEach(jsonElement -> mappedBeatTimes.add(jsonElement.getAsDouble()));
-
 
         final EnumSet<EditingFlag> mappedEditingFlags = EnumSet.noneOf(EditingFlag.class);
 
@@ -116,7 +105,6 @@ public class VideoEditorBuilder {
                 .setAudioPath(sourceAudio)
                 .setFilters(mappedFilters)
                 .setFlags(mappedEditingFlags)
-                .setTimeBetweenBeats(new ArrayDeque<>(mappedBeatTimes))
                 .setIntroStart(introStart)
                 .setIntroEnd(introEnd)
                 .setVideoClips(mappedVideoClips)
@@ -125,6 +113,6 @@ public class VideoEditorBuilder {
 
 
     public VideoEditor createVideoEditor() {
-        return new VideoEditor(videoPath, audioPath, outputFile, timeBetweenBeats, videoClips, flags, filters, introStart, introEnd, workingDirectory);
+        return new VideoEditor(videoPath, audioPath, outputFile, videoClips, flags, filters, introStart, introEnd, workingDirectory);
     }
 }

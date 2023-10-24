@@ -16,6 +16,8 @@ public class BasicEditorBuilder {
     private List<FilterWrapper> filters = new ArrayList<>();
     private EnumSet<EditingFlag> editingFlags = EnumSet.noneOf(EditingFlag.class);
 
+    private long editLength;
+
     public BasicEditorBuilder setVideoGrabber(FFmpegFrameGrabber videoGrabber) {
         this.videoGrabber = videoGrabber;
         return this;
@@ -41,7 +43,12 @@ public class BasicEditorBuilder {
         return this;
     }
 
+    public BasicEditorBuilder setEditLength(long editLength) {
+        this.editLength = editLength;
+        return this;
+    }
+
     public BasicEditor createBasicEditor() {
-        return new BasicEditor(videoGrabber, audioPath, recorder, filters, editingFlags);
+        return new BasicEditor(videoGrabber, audioPath, recorder, filters, editingFlags, editLength);
     }
 }
