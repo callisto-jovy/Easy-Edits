@@ -51,9 +51,6 @@ public class VideoEditor implements Editor {
 
     private final File outputFile, workingDirectory;
 
-    private int editLength;
-
-
     public VideoEditor(final String videoPath,
                        final String audioPath,
                        final File outputFile,
@@ -187,11 +184,15 @@ public class VideoEditor implements Editor {
         // List of all the segment files in order.
         final List<File> segmentFiles = new ArrayList<>();
 
+        // The videos framerate
+        final double frameRate = videoGrabber.getFrameRate();
+        // The time one frame takes in ms.
+        final double frameTime = 1000 / frameRate;
+
         // Shuffle the sequences if the flag is toggled.
         if (editingFlags.contains(EditingFlag.SHUFFLE_SEQUENCES)) {
             Collections.shuffle(videoClips);
         }
-
         try {
 
             /* Record the intro */
@@ -252,8 +253,16 @@ public class VideoEditor implements Editor {
                 }
 
                 Frame frame;
-                while (videoGrabber.getTimestamp() - videoClip.getTimeStamp() < videoClip.getLength() && (frame = videoClip.isMuteAudio() ? videoGrabber.grabImage() : videoGrabber.grab()) != null) {
+                // videoGrabber.getTimestamp() - videoClip.getTimeStamp() < videoClip.getLength() does not work, why soever
+
+                // Time passed in frame times.
+                double localMs = 0;
+
+                while (localMs < (videoClip.getLength() / 1000D) && (frame = videoClip.isMuteAudio() ? videoGrabber.grabImage() : videoGrabber.grab()) != null) {
+
                     FFmpegUtil.pushToFilters(frame, recorder, filters);
+
+                    localMs += frameTime;
                 }
 
                 // Close the filter(s) if there are any.
