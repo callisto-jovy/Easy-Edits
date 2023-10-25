@@ -36,7 +36,7 @@ public interface Editor {
     }
 
     default FFmpegFrameFilter overlayAudioFilter(final FFmpegFrameRecorder recorder) throws FFmpegFrameFilter.Exception {
-        final FFmpegFrameFilter overlayFilter = FFmpegUtil.configureAudioFilter("[1:a]volume=1.35[a1]; [a1][0:a]amerge=inputs=2[a]", recorder.getSampleRate(), recorder.getSampleFormat());
+        final FFmpegFrameFilter overlayFilter = FFmpegUtil.configureAudioFilter("[1:a]volume=2.5[a1]; [0:a][a1]amerge=inputs=2[a]", recorder.getSampleRate(), recorder.getSampleFormat());
         overlayFilter.setAudioInputs(2);
         overlayFilter.start();
         return overlayFilter;
