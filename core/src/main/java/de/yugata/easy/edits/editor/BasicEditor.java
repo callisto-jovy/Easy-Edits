@@ -143,7 +143,7 @@ public class BasicEditor implements Editor {
                 final long startTime = audioGrabber.getTimestamp(); // take note of our starting time, so that we know how many microseconds have passed
 
                 Frame audioFrame;
-                while (audioGrabber.getTimestamp() - startTime < segmentGrabber.getLengthInTime() && (audioFrame = audioGrabber.grabSamples()) != null) {
+                while (audioGrabber.getTimestamp() - startTime <= segmentGrabber.getLengthInTime() && (audioFrame = audioGrabber.grabSamples()) != null) {
                     // process the audio frame, convert the audio frame to our sample-rate, sample-format
                     convertAudioFilter.push(audioFrame);
 
@@ -173,7 +173,7 @@ public class BasicEditor implements Editor {
                 final long startTime = audioGrabber.getTimestamp(); // take note of our starting time, so that we know how many microseconds have passed
 
                 Frame audioFrame;
-                while (audioGrabber.getTimestamp() - startTime < segmentGrabber.getLengthInTime() && (audioFrame = audioGrabber.grabSamples()) != null) {
+                while (audioGrabber.getTimestamp() - startTime <= segmentGrabber.getLengthInTime() && (audioFrame = audioGrabber.grabSamples()) != null) {
                     recorder.record(audioFrame);
                 }
             }
