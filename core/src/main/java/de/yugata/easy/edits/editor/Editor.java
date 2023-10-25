@@ -37,16 +37,23 @@ public interface Editor {
     }
 
     default FFmpegFrameFilter overlayAudioFilter(final FFmpegFrameRecorder recorder) throws FFmpegFrameFilter.Exception {
-        final FFmpegFrameFilter overlayFilter = FFmpegUtil.configureAudioFilter("[0:a]volume=6.5[a1]; [1:a]volume=1[a2]; [a1][a2]amerge=inputs=2[a]", recorder.getSampleRate(), recorder.getSampleFormat());
+        final BytePointer sampleFormatName = avutil.av_get_sample_fmt_name(recorder.getSampleFormat());
+
+
+        final String aformat = String.format("aformat=%s:sample_rates=%d:channel_layouts=stereo", sampleFormatName.getString(), recorder.getSampleRate());
+
+
+        final FFmpegFrameFilter overlayFilter = FFmpegUtil.configureAudioFilter(String.format("[0:a]volume=1, %s[a1]; [1:a]volume=0.1, %s[a2]; [a1][a2]amerge,pan=stereo|c0<c0+c2|c1<c1+c3[a]", aformat, aformat), recorder.getSampleRate(), recorder.getSampleFormat());
         overlayFilter.setAudioInputs(2);
         overlayFilter.start();
+        sampleFormatName.close(); // release reference
         return overlayFilter;
     }
 
 
     default FFmpegFrameFilter convertAudioFilter(final FFmpegFrameRecorder recorder) throws FFmpegFrameFilter.Exception {
         final BytePointer sampleFormatName = avutil.av_get_sample_fmt_name(recorder.getSampleFormat());
-        final FFmpegFrameFilter convertAudioFilter = FFmpegUtil.configureAudioFilter(String.format("aformat=sample_fmts=%s:sample_rates=%d", sampleFormatName.getString(), recorder.getSampleRate()), recorder.getSampleRate(), recorder.getSampleFormat());
+        final FFmpegFrameFilter convertAudioFilter = FFmpegUtil.configureAudioFilter(String.format("aformat=sample_fmts=%s:sample_rates=%d:channel_layouts=stereo", sampleFormatName.getString(), recorder.getSampleRate()), recorder.getSampleRate(), recorder.getSampleFormat());
         convertAudioFilter.setAudioInputs(1);
         convertAudioFilter.start();
 
@@ -67,7 +74,6 @@ public interface Editor {
 
         return time;
     }
-
 
 
 }
