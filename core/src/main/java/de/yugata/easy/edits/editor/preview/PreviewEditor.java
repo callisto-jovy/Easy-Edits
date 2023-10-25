@@ -81,7 +81,7 @@ public class PreviewEditor implements Editor {
 
         recorder.setAudioOption("ac", "2"); // Downsample the 5.1 to stereo
 
-        recorder.setVideoQuality(36);
+        recorder.setVideoQuality(18);
         recorder.setPixelFormat(AV_PIX_FMT_YUV420P);
         recorder.setSampleFormat(avutil.AV_SAMPLE_FMT_FLTP);
         recorder.setSampleRate(grabber.getSampleRate());
