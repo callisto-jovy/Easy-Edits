@@ -159,14 +159,13 @@ public class BasicEditor implements Editor {
                         });
                     }
                 }
-
+                
                 // Pull from the overlay filter & record.
                 Frame overlayFrame;
                 while ((overlayFrame = overlayFilter.pull()) != null) {
                     // Set the timestamp in the recorder.
                     recorder.record(overlayFrame);
                 }
-
             } else { // no audio stream, just record the background music
 
                 // Add as many audio frames as are needed for the segment.

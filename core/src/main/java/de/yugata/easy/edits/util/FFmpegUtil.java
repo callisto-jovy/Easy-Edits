@@ -170,7 +170,6 @@ public class FFmpegUtil {
         recorder.setAudioCodec(avcodec.AV_CODEC_ID_AAC); // Standard
         recorder.setFrameRate(inputGrabber.getFrameRate()); //
         recorder.setSampleRate(inputGrabber.getSampleRate()); // Sample rate from the audio source
-        recorder.setSampleFormat(avutil.AV_SAMPLE_FMT_FLTP);
         // Select the "highest" bitrate.
         recorder.setVideoBitrate(0); // max bitrate
 
