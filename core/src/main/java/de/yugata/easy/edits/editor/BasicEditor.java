@@ -135,8 +135,8 @@ public class BasicEditor implements Editor {
                 Frame segmentAudio;
                 while ((segmentAudio = segmentGrabber.grabSamples()) != null) {
 
-                    // Push the background audio to [1], no volume decrease
-                    overlayFilter.push(1, segmentAudio);
+                    // Push the background audio to [0], no volume decrease
+                    overlayFilter.push(0, segmentAudio);
                 }
 
                 // Add as many audio frames as are needed for the segment.
@@ -152,7 +152,7 @@ public class BasicEditor implements Editor {
 
                         FFmpegUtil.pushToFilterOrElse(convertAudioFrame, simpleAudioFiler, f -> {
                             try {
-                                overlayFilter.push(0, f);
+                                overlayFilter.push(1, f);
                             } catch (FFmpegFrameFilter.Exception e) {
                                 throw new RuntimeException(e);
                             }
@@ -177,6 +177,7 @@ public class BasicEditor implements Editor {
                     recorder.record(audioFrame);
                 }
             }
+
             // Safety mechanism, in the case that no audio has been recorded.
             recorder.setFrameNumber(postVideoFrameNumber);
 
