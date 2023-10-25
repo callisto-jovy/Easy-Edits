@@ -1,11 +1,12 @@
 package de.yugata.easy.edits.editor;
 
-import de.yugata.easy.edits.editor.edit.EditInfo;
-import de.yugata.easy.edits.editor.edit.EditInfoBuilder;
 import de.yugata.easy.edits.util.FFmpegUtil;
 import org.bytedeco.ffmpeg.global.avutil;
 import org.bytedeco.javacpp.BytePointer;
-import org.bytedeco.javacv.*;
+import org.bytedeco.javacv.FFmpegFrameFilter;
+import org.bytedeco.javacv.FFmpegFrameGrabber;
+import org.bytedeco.javacv.FFmpegFrameRecorder;
+import org.bytedeco.javacv.FrameGrabber;
 
 import java.io.File;
 import java.util.List;
@@ -36,7 +37,7 @@ public interface Editor {
     }
 
     default FFmpegFrameFilter overlayAudioFilter(final FFmpegFrameRecorder recorder) throws FFmpegFrameFilter.Exception {
-        final FFmpegFrameFilter overlayFilter = FFmpegUtil.configureAudioFilter("[1:a]volume=2.5[a1]; [0:a][a1]amerge=inputs=2[a]", recorder.getSampleRate(), recorder.getSampleFormat());
+        final FFmpegFrameFilter overlayFilter = FFmpegUtil.configureAudioFilter("[0:a]volume=6.5[a1]; [1:a]volume=1[a2]; [a1][a2]amerge=inputs=2[a]", recorder.getSampleRate(), recorder.getSampleFormat());
         overlayFilter.setAudioInputs(2);
         overlayFilter.start();
         return overlayFilter;

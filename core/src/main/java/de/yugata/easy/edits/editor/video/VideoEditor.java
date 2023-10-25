@@ -258,7 +258,9 @@ public class VideoEditor implements Editor {
                 // Time passed in frame times.
                 double localMs = 0;
 
-                while (localMs < (videoClip.getLength() / 1000D) && (frame = videoClip.isMuteAudio() ? videoGrabber.grabImage() : videoGrabber.grab()) != null) {
+                while (videoGrabber.getTimestamp() - videoClip.getTimeStamp() < videoClip.getLength() && (frame = videoClip.isMuteAudio() ? videoGrabber.grabImage() : videoGrabber.grab()) != null) {
+
+                    System.out.println("localMs = " + localMs);
 
                     FFmpegUtil.pushToFilters(frame, recorder, filters);
 
