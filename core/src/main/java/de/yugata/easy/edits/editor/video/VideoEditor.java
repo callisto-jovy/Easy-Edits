@@ -7,6 +7,8 @@ import de.yugata.easy.edits.editor.edit.EditInfoBuilder;
 import de.yugata.easy.edits.editor.edit.EditingFlag;
 import de.yugata.easy.edits.filter.*;
 import de.yugata.easy.edits.util.FFmpegUtil;
+import org.bytedeco.ffmpeg.global.avcodec;
+import org.bytedeco.ffmpeg.global.avutil;
 import org.bytedeco.javacv.*;
 
 import java.io.File;
@@ -15,8 +17,7 @@ import java.nio.FloatBuffer;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.bytedeco.ffmpeg.global.avutil.AV_LOG_VERBOSE;
-import static org.bytedeco.ffmpeg.global.avutil.av_log_set_level;
+import static org.bytedeco.ffmpeg.global.avutil.*;
 
 /**
  * TODO: This needs documentation & a cleanup
@@ -129,6 +130,46 @@ public class VideoEditor implements Editor {
         }
     }
 
+    private FFmpegFrameRecorder createRecorder(final File outputFile, final EnumSet<EditingFlag> editingFlags, final FFmpegFrameGrabber inputGrabber) throws FFmpegFrameRecorder.Exception {
+        final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(outputFile, inputGrabber.getImageWidth(), inputGrabber.getImageHeight(), 2);
+
+        recorder.setFormat("mkv");
+
+        // Preserve the color range for the HDR video files.
+        // This lets us tone-map the hdr content later on if we want to.
+        //TODO: get this from the grabber
+        if (editingFlags.contains(EditingFlag.WRITE_HDR_OPTIONS)) {
+            recorder.setVideoOption("color_range", "tv");
+            recorder.setVideoOption("colorspace", "bt2020nc");
+            recorder.setVideoOption("color_primaries", "bt2020");
+            recorder.setVideoOption("color_trc", "smpte2084");
+        }
+
+        // best quality --> Produces big files
+        if (editingFlags.contains(EditingFlag.BEST_QUALITY)) {
+            recorder.setVideoQuality(12);
+            recorder.setVideoOption("cq", "12");
+            recorder.setOption("preset", "slow");
+            recorder.setVideoOption("profile", "main10");
+            recorder.setVideoOption("crf", "12");
+            recorder.setOption("tune", "hq");
+            recorder.setOption("bf", "2");
+        }
+
+        recorder.setAudioOption("ac", "2"); // Downsample the 5.1 to stereo
+        recorder.setVideoCodec(avcodec.AV_CODEC_ID_H265);
+        recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
+
+        recorder.setSampleFormat(avutil.AV_SAMPLE_FMT_FLTP);
+        recorder.setAudioCodec(avcodec.AV_CODEC_ID_AAC); // Standard
+        recorder.setFrameRate(inputGrabber.getFrameRate()); //
+        recorder.setSampleRate(inputGrabber.getSampleRate()); // Sample rate from the audio source
+        // Select the "highest" bitrate.
+        recorder.setVideoBitrate(0); // max bitrate
+
+        return recorder;
+    }
+
     /**
      * Collects the segments creates by the video editor.
      *
@@ -157,13 +198,17 @@ public class VideoEditor implements Editor {
         try {
             // Grabs the audio frames from the supplied audio
             final FFmpegFrameGrabber overlayAudioGrabber = new FFmpegFrameGrabber(overlayAudioPath);
+            overlayAudioGrabber.setSampleFormat(AV_SAMPLE_FMT_FLTP);
             overlayAudioGrabber.start();
 
+            // grabs audio frames from the concatenated sequence audio.
             final FFmpegFrameGrabber segmentAudioGrabber = new FFmpegFrameGrabber(segmentAudioFile);
+            // segmentAudioGrabber.setSampleMode(FrameGrabber.SampleMode.FLOAT);
+            segmentAudioGrabber.setSampleFormat(AV_SAMPLE_FMT_FLTP); // Does not read properly-
             segmentAudioGrabber.start();
 
             // Configure the recorder
-            final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(outputFile, editingFlags, videoGrabber);
+            final FFmpegFrameRecorder recorder = createRecorder(outputFile, editingFlags, videoGrabber);
             recorder.setAudioCodec(segmentAudioGrabber.getAudioCodec());
             recorder.setSampleRate(segmentAudioGrabber.getSampleRate());
             recorder.setSampleFormat(segmentAudioGrabber.getSampleFormat());
@@ -172,7 +217,7 @@ public class VideoEditor implements Editor {
 
             // Edit: I fucking hate this, we just pass the frame grabber in the fucking future...
             final EditInfo editInfo = new EditInfoBuilder()
-                    .setEditTime(getEditLength(segmentPaths))
+                    .setEditTime(overlayAudioGrabber.getLengthInTime())
                     .setAudioCodec(overlayAudioGrabber.getAudioCodec())
                     .setAspectRatio(videoGrabber.getAspectRatio())
                     .setAudioChannels(overlayAudioGrabber.getAudioChannels())
@@ -207,7 +252,12 @@ public class VideoEditor implements Editor {
             // optional: Frame filter with chained together video filters
             final FFmpegFrameFilter simpleVideoFiler = FFmpegUtil.populateVideoFilters(editInfo);
 
+            /* Workflow */
 
+            //  1. Record the segments video frames.
+            //  2. Record the audio frames in a separate loop#
+
+            /* Segment loop */
             for (final String inputPath : segmentPaths) {
                 // grabber for the individual clip segment
                 final FFmpegFrameGrabber segmentGrabber = baseSegmentGrabber(new File(inputPath), recorder, "h265_cuvid");
@@ -217,10 +267,6 @@ public class VideoEditor implements Editor {
 
                 // Add the filters to a chain.
                 final FFmpegFrameFilter[] filters = simpleVideoFiler == null ? new FFmpegFrameFilter[0] : transitionFilter == null ? new FFmpegFrameFilter[]{simpleVideoFiler} : new FFmpegFrameFilter[]{transitionFilter, simpleVideoFiler};
-
-                /* Workflow */
-                //  1. Record the segments video frames.
-                //  2. Record the audio frames in a separate loop
 
                 // grab the video frames & send them to the filters
                 Frame frame;
@@ -232,10 +278,10 @@ public class VideoEditor implements Editor {
                 if (transitionFilter != null)
                     transitionFilter.close();
 
-                segmentGrabber.close();
+                segmentGrabber.close(); // Close the segment grabber, free the resources.
             }
 
-            /* End samples loop */
+            /* End video loop */
 
 
             Frame segmentAudio;
@@ -265,11 +311,14 @@ public class VideoEditor implements Editor {
             Frame overlayFrame;
             while ((overlayFrame = overlayFilter.pull()) != null) {
                 // Set the timestamp in the recorder.
+                recorder.setTimestamp(overlayFrame.timestamp);
                 recorder.record(overlayFrame);
             }
 
 
             /* End audio grabbing */
+
+            /* Close & free resources */
 
             if (simpleVideoFiler != null)
                 simpleVideoFiler.close();
@@ -306,16 +355,17 @@ public class VideoEditor implements Editor {
             final FFmpegFrameRecorder audioRecorder = new FFmpegFrameRecorder(segmentAudioFile, 2);
             audioRecorder.setAudioOption("ac", "2"); // Downsample the 5.1 to stereo
             audioRecorder.setSampleRate(videoGrabber.getSampleRate()); // Sample rate from the audio source
-            audioRecorder.setSampleFormat(videoGrabber.getSampleFormat());
-            audioRecorder.setAudioBitrate(videoGrabber.getAudioBitrate());
+            audioRecorder.setSampleFormat(AV_SAMPLE_FMT_FLTP);
+            audioRecorder.setAudioCodec(avcodec.AV_CODEC_ID_AAC); // Standard
             audioRecorder.setFrameRate(videoGrabber.getAudioFrameRate());
             audioRecorder.start();
+
 
             /* Record the intro */
 
             if (introStart != -1 && introEnd != -1) {
                 final File introFile = new File(workingDirectory, "segment 0.mp4");
-                final FFmpegFrameRecorder introRecorder = FFmpegUtil.createRecorder(introFile, editingFlags, videoGrabber);
+                final FFmpegFrameRecorder introRecorder = createRecorder(introFile, editingFlags, videoGrabber);
                 introRecorder.start();
 
                 this.videoGrabber.setTimestamp(introStart);
@@ -334,14 +384,12 @@ public class VideoEditor implements Editor {
             for (int i = 0; i < videoClips.size(); i++) {
                 final VideoClip videoClip = videoClips.get(i);
 
-                // Navigate to the clip.
-                videoGrabber.setVideoTimestamp(videoClip.getTimeStamp());
-
                 // Write a new segment to disk
                 final File segmentFile = new File(workingDirectory, String.format("segment %d.mp4", introStart == -1 ? i : i + 1));
                 segmentFiles.add(segmentFile); // Add the file to the segments.
 
-                final FFmpegFrameRecorder recorder = FFmpegUtil.createRecorder(segmentFile, editingFlags, videoGrabber);
+                // Recorder for the segment file. Configured in the same way the final recorder is configured, as to not lose quality.
+                final FFmpegFrameRecorder recorder = createRecorder(segmentFile, editingFlags, videoGrabber);
                 recorder.start();
 
                 final FFmpegFrameFilter[] filters;
@@ -370,22 +418,35 @@ public class VideoEditor implements Editor {
                     filters = new FFmpegFrameFilter[0];
                 }
 
+                // Navigate to the clip.
+                videoGrabber.setVideoTimestamp(videoClip.getTimeStamp());
+
+                double videoMsPassed = 0;
+
                 Frame frame;
-                final long frameLenience = 4;
-                while (videoGrabber.getTimestamp() - videoClip.getTimeStamp() <= videoClip.getLength() + frameLenience && (frame = videoGrabber.grab()) != null) {
-                    if (frame.getTypes().contains(Frame.Type.VIDEO)) {
-                        FFmpegUtil.pushToFilters(frame, recorder, filters);
-                    } else if (frame.getTypes().contains(Frame.Type.AUDIO)) {
-                        // Record null samples.
-                        if (videoClip.isMuteAudio()) {
-                            final FloatBuffer silence = FloatBuffer.allocate((int) ((audioRecorder.getAudioChannels() * audioRecorder.getSampleRate()) / audioRecorder.getFrameRate()));
-                            audioRecorder.recordSamples(silence);
-                            silence.flip();
-                            silence.clear();
-                        } else {
-                            audioRecorder.record(frame);
-                        }
+                while (videoMsPassed <= (videoClip.getLength() / 1000D) && (frame = videoGrabber.grabImage()) != null) {
+                    FFmpegUtil.pushToFilters(frame, recorder, filters);
+
+                    videoMsPassed += 1000D / videoGrabber.getFrameRate();
+                }
+
+
+                double audioMsPassed = 0;
+
+                while (audioMsPassed <= (videoClip.getLength() / 1000D)) {
+                    // Record null samples.
+                    if (videoClip.isMuteAudio()) {
+                        final FloatBuffer silence = FloatBuffer.allocate((int) ((audioRecorder.getAudioChannels() * audioRecorder.getSampleRate()) / audioRecorder.getFrameRate()));
+                        audioRecorder.recordSamples(silence);
+                        silence.flip();
+                        silence.clear();
+                    } else {
+                        Frame audioFrame;
+
+                        if ((audioFrame = videoGrabber.grabSamples()) != null)
+                            audioRecorder.record(audioFrame);
                     }
+                    audioMsPassed += 1000D / audioRecorder.getFrameRate();
                 }
 
                 // Close the filter(s) if there are any.
@@ -395,15 +456,15 @@ public class VideoEditor implements Editor {
 
                 // Close our local recorder.
                 recorder.close();
-            }
-            /* End video clip loop */
+            }   /* End video clip loop */
 
-            audioRecorder.close();
-            this.releaseFrameGrabber();
 
+            audioRecorder.close(); // Close the audio recorder.
         } catch (IOException e) {
             e.printStackTrace();
 
+        } finally {
+            this.releaseFrameGrabber();
         }
         return segmentFiles;
     }

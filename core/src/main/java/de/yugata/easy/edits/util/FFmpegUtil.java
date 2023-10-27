@@ -134,48 +134,6 @@ public class FFmpegUtil {
         grabber.setVideoBitrate(0);
     }
 
-    public static FFmpegFrameRecorder createRecorder(final File outputFile, final EnumSet<EditingFlag> editingFlags, final FFmpegFrameGrabber inputGrabber) throws FFmpegFrameRecorder.Exception {
-        final FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(outputFile, inputGrabber.getImageWidth(), inputGrabber.getImageHeight(), 2);
-
-        recorder.setFormat("mkv");
-
-        // Preserve the color range for the HDR video files.
-        // This lets us tone-map the hdr content later on if we want to.
-        //TODO: get this from the grabber
-        if (editingFlags.contains(EditingFlag.WRITE_HDR_OPTIONS)) {
-            recorder.setVideoOption("color_range", "tv");
-            recorder.setVideoOption("colorspace", "bt2020nc");
-            recorder.setVideoOption("color_primaries", "bt2020");
-            recorder.setVideoOption("color_trc", "smpte2084");
-        }
-
-        if (editingFlags.contains(EditingFlag.BEST_QUALITY)) {
-            recorder.setVideoQuality(12); // best quality --> Produces big files
-            recorder.setVideoOption("cq", "12");
-            recorder.setOption("preset", "slow");
-            recorder.setVideoOption("profile", "main10");
-            recorder.setVideoOption("crf", "12");
-            recorder.setVideoOption("qmin", "0");
-            recorder.setVideoOption("qmax", "0");
-            recorder.setOption("tune", "hq");
-            recorder.setOption("bf", "2");
-            recorder.setOption("lookahead", "8");
-            recorder.setOption("rc", "constqp");
-        }
-
-        recorder.setAudioOption("ac", "2"); // Downsample the 5.1 to stereo
-        recorder.setVideoCodec(avcodec.AV_CODEC_ID_H265);
-        recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
-
-        recorder.setAudioCodec(avcodec.AV_CODEC_ID_AAC); // Standard
-        recorder.setFrameRate(inputGrabber.getFrameRate()); //
-        recorder.setSampleRate(inputGrabber.getSampleRate()); // Sample rate from the audio source
-        // Select the "highest" bitrate.
-        recorder.setVideoBitrate(0); // max bitrate
-
-        return recorder;
-    }
-
 
     public static FFmpegFrameFilter configureAudioFilter(final String filter, final int sampleRate, final int sampleFormat) {
         final FFmpegFrameFilter fFmpegFrameFilter = new FFmpegFrameFilter(filter, 2);
@@ -257,7 +215,7 @@ public class FFmpegUtil {
     }
 
 
-    public static FFmpegFrameFilter populateAudioFilters() throws FFmpegFrameFilter.Exception {
+    public static FFmpegFrameFilter populateAudioFilters() {
         final List<Filter> filters = FilterManager.FILTER_MANAGER.getFilters(filter -> filter.getFilterType() == FilterType.AUDIO);
 
         if (filters.isEmpty())
