@@ -43,7 +43,7 @@ public interface Editor {
         final String aformat = String.format("aformat=%s:sample_rates=%d:channel_layouts=stereo", sampleFormatName.getString(), recorder.getSampleRate());
 
 
-        final FFmpegFrameFilter overlayFilter = FFmpegUtil.configureAudioFilter(String.format("[0:a]volume=1, %s[a1]; [1:a]volume=0.1, %s[a2]; [a1][a2]amerge,pan=stereo|c0<c0+c2|c1<c1+c3[a]", aformat, aformat), recorder.getSampleRate(), recorder.getSampleFormat());
+        final FFmpegFrameFilter overlayFilter = FFmpegUtil.configureAudioFilter(String.format("[0:a]volume=2.25, %s[a1]; [1:a]volume=0.25, %s[a2]; [a1][a2]amerge,pan=stereo|c0<c0+c2|c1<c1+c3[a]", aformat, aformat), recorder.getSampleRate(), recorder.getSampleFormat());
         overlayFilter.setAudioInputs(2);
         overlayFilter.start();
         sampleFormatName.close(); // release reference
