@@ -9,7 +9,7 @@
       "name": "fadeStart",
       "type": "VARIABLE",
       "mapped": "edit_time_s",
-      "offset": "-5"
+      "offset": "-3"
     },
     {
       "name": "fadeDuration",
