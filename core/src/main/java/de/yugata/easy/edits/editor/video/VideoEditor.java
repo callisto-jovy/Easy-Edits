@@ -100,7 +100,17 @@ public class VideoEditor implements Editor {
                 this.videoGrabber = new FFmpegFrameGrabber(videoPath);
                 FFmpegUtil.configureGrabber(videoGrabber);
 
-                videoGrabber.setVideoCodecName("hevc_cuvid");
+
+                if (videoGrabber.getVideoCodec() == avcodec.AV_CODEC_ID_H265) {
+                    videoGrabber.setVideoCodecName("hvec_cuvid");
+                } else if (videoGrabber.getVideoCodec() == avcodec.AV_CODEC_ID_H264) {
+                    videoGrabber.setVideoCodecName("h264_cuvid");
+                } else if (videoGrabber.getVideoCodec() == avcodec.AV_CODEC_ID_NONE) {
+                    videoGrabber.setVideoCodecName("h264_cuvid");
+                } else {
+                    throw new RuntimeException("Supplied video codec not supported.");
+                }
+
                 videoGrabber.start();
 
             } catch (FFmpegFrameGrabber.Exception e) {
@@ -161,7 +171,7 @@ public class VideoEditor implements Editor {
         recorder.setPixelFormat(avutil.AV_PIX_FMT_YUV420P);
 
         recorder.setSampleFormat(avutil.AV_SAMPLE_FMT_FLTP);
-        recorder.setAudioCodec(avcodec.AV_CODEC_ID_AAC); // Standard
+        recorder.setAudioCodec(avcodec.AV_CODEC_ID_AC3); // Standard
         recorder.setFrameRate(inputGrabber.getFrameRate()); //
         recorder.setSampleRate(inputGrabber.getSampleRate()); // Sample rate from the audio source
         // Select the "highest" bitrate.
@@ -217,7 +227,7 @@ public class VideoEditor implements Editor {
 
             // Edit: I fucking hate this, we just pass the frame grabber in the fucking future...
             final EditInfo editInfo = new EditInfoBuilder()
-                    .setEditTime(overlayAudioGrabber.getLengthInTime())
+                    .setEditTime(segmentAudioGrabber.getLengthInTime())
                     .setAudioCodec(overlayAudioGrabber.getAudioCodec())
                     .setAspectRatio(videoGrabber.getAspectRatio())
                     .setAudioChannels(overlayAudioGrabber.getAudioChannels())
@@ -356,7 +366,7 @@ public class VideoEditor implements Editor {
             audioRecorder.setAudioOption("ac", "2"); // Downsample the 5.1 to stereo
             audioRecorder.setSampleRate(videoGrabber.getSampleRate()); // Sample rate from the audio source
             audioRecorder.setSampleFormat(AV_SAMPLE_FMT_FLTP);
-            audioRecorder.setAudioCodec(avcodec.AV_CODEC_ID_AAC); // Standard
+            audioRecorder.setAudioCodec(avcodec.AV_CODEC_ID_AC3);
             audioRecorder.setFrameRate(videoGrabber.getAudioFrameRate());
             audioRecorder.start();
 
@@ -424,15 +434,17 @@ public class VideoEditor implements Editor {
                 double videoMsPassed = 0;
 
                 Frame frame;
-                while (videoMsPassed <= (videoClip.getLength() / 1000D) && (frame = videoGrabber.grabImage()) != null) {
+                while ((frame = videoGrabber.grabImage()) != null && videoMsPassed < (videoClip.getLength() / 1000D)) {
+
+                    System.out.println((videoGrabber.getTimestamp() - videoClip.getTimeStamp()) / 1000);
                     FFmpegUtil.pushToFilters(frame, recorder, filters);
 
                     videoMsPassed += 1000D / videoGrabber.getFrameRate();
                 }
 
+                videoGrabber.setAudioTimestamp(videoClip.getTimeStamp());
 
                 double audioMsPassed = 0;
-
                 while (audioMsPassed <= (videoClip.getLength() / 1000D)) {
                     // Record null samples.
                     if (videoClip.isMuteAudio()) {
