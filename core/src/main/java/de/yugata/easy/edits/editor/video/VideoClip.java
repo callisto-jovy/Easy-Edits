@@ -8,7 +8,6 @@ public class VideoClip {
 
     private final long timeStamp;
     private final long length;
-
     private final boolean muteAudio;
 
 
